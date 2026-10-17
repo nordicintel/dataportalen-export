@@ -55,9 +55,9 @@ jobs:
         with:
           name: failed-harvest-state
           path: |
-            .export-*/data/source_records.jsonl.gz
+            .export-*/data/source_records.jsonl.*
             .export-*/data/raw/dataportal.rdf.gz
-            .export-*/data/catalog.db.gz
+            .export-*/data/catalog.db.*
           include-hidden-files: true
           retention-days: 1
           compression-level: 0

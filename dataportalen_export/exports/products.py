@@ -4,6 +4,7 @@ import gzip
 import hashlib
 import json
 import logging
+import lzma
 import os
 import shutil
 import sqlite3
@@ -28,12 +29,16 @@ def checksum(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def compress_file(path):
-    target = path.with_name(path.name + ".gz")
-    with path.open("rb") as source, target.open("wb") as output:
-        with gzip.GzipFile(
-            fileobj=output, mode="wb", mtime=0, filename=""
-        ) as compressed:
+def compress_file(path, method, level):
+    target = path.with_name(path.name + (".xz" if method == "xz" else ".gz"))
+    with path.open("rb") as source:
+        if method == "xz":
+            compressed = lzma.open(target, "wb", preset=level)
+        else:
+            compressed = gzip.GzipFile(
+                filename=str(target), mode="wb", mtime=0, compresslevel=level
+            )
+        with compressed:
             shutil.copyfileobj(source, compressed)
     path.unlink()
     return target
@@ -69,7 +74,9 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         with raw_records.open("w", encoding="utf-8", newline="\n") as stream:
             for record in sorted(state.records.values(), key=lambda r: r.id):
                 stream.write(json_text(record.model_dump()) + "\n")
-        state_file = compress_file(raw_records)
+        state_file = compress_file(
+            raw_records, config.output.compression, config.output.compression_level
+        )
         content_digest = checksum(state_file)
         previous_manifest = (
             json.loads((output / "manifest.json").read_text())
@@ -83,7 +90,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
 
         def reuse(name):
             if reusable:
-                for suffix in ("", ".gz"):
+                for suffix in ("", ".gz", ".xz"):
                     old = output / (name + suffix)
                     if old.exists():
                         shutil.copyfile(old, candidate / old.name)
@@ -128,14 +135,24 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             if not path.is_file():
                 continue
             if (
-                path.stat().st_size > config.output.gzip_threshold_mib * 1024**2
-                and path.suffix != ".gz"
+                path.stat().st_size > config.output.compression_threshold_mib * 1024** 2
+                and path.suffix not in {".gz", ".xz"}
             ):
-                path = compress_file(path)
+                log.info(
+                    "Compressing %s with %s",
+                    path.relative_to(candidate),
+                    config.output.compression,
+                )
+                path = compress_file(
+                    path, config.output.compression, config.output.compression_level
+                )
             if path.stat().st_size >= 100 * 1024**2:
-                if path.name == "datasets.jsonl.gz" and path.parent == candidate:
+                if (
+                    path.name in {"datasets.jsonl.gz", "datasets.jsonl.xz"}
+                    and path.parent == candidate
+                ):
                     omissions.append(
-                        "Combined datasets.jsonl exceeds GitHub limit after gzip; use catalog splits"
+                        "Combined datasets.jsonl exceeds GitHub limit after compression; use catalog splits"
                     )
                     path.unlink()
                 else:
@@ -210,17 +227,24 @@ def validate_products(directory: Path):
             path = directory / name
             if path.stat().st_size != info["bytes"] or checksum(path) != info["sha256"]:
                 raise ValueError(f"Checksum mismatch: {name}")
-            original_name = name.removesuffix(".gz")
+            original_name = name.removesuffix(".gz").removesuffix(".xz")
+            opener = (
+                lzma.open
+                if name.endswith(".xz")
+                else gzip.open
+                if name.endswith(".gz")
+                else open
+            )
             if name.startswith("raw/"):
-                with gzip.open(path, "rb") as stream:
+                with opener(path, "rb") as stream:
                     while stream.read(1024 * 1024):
                         pass
                 continue
-            if name.endswith(".gz") and original_name.endswith(
+            if name.endswith((".gz", ".xz")) and original_name.endswith(
                 (".db", ".duckdb", ".parquet", ".jsonld")
             ):
                 unpacked = Path(temporary) / Path(original_name).name
-                with gzip.open(path, "rb") as source, unpacked.open("wb") as target:
+                with opener(path, "rb") as source, unpacked.open("wb") as target:
                     shutil.copyfileobj(source, target)
                 path = unpacked
             if original_name.endswith(".db"):
@@ -266,7 +290,6 @@ def validate_products(directory: Path):
             elif original_name.endswith(".jsonld"):
                 Dataset().parse(path, format="json-ld")
             elif original_name.endswith(".jsonl"):
-                opener = gzip.open if name.endswith(".gz") else open
                 with opener(path, "rt", encoding="utf-8") as stream:
                     for line in stream:
                         json.loads(line)

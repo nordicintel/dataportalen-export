@@ -1,6 +1,7 @@
 """One retained version per source record; failed scopes never imply deletion."""
 
 import gzip
+import lzma
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -82,10 +83,18 @@ class CurrentState:
 
     @classmethod
     def load(cls, directory: Path):
-        path = directory / "source_records.jsonl.gz"
-        if not path.exists():
+        path = next(
+            (
+                directory / name
+                for name in ("source_records.jsonl.xz", "source_records.jsonl.gz")
+                if (directory / name).exists()
+            ),
+            None,
+        )
+        if path is None:
             return cls()
-        with gzip.open(path, "rt", encoding="utf-8") as stream:
+        opener = lzma.open if path.suffix == ".xz" else gzip.open
+        with opener(path, "rt", encoding="utf-8") as stream:
             records = [
                 SourceRecord.model_validate_json(line)
                 for line in stream

@@ -3,6 +3,7 @@
 import tomllib
 from datetime import time
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -68,7 +69,9 @@ class Output(Settings):
     duckdb: bool = True
     parquet: bool = True
     jsonld: bool = True
-    gzip_threshold_mib: float = Field(default=95, gt=0, le=95)
+    compression: Literal["xz", "gzip"] = "xz"
+    compression_level: int = Field(default=6, ge=0, le=9)
+    compression_threshold_mib: float = Field(default=95, gt=0, le=95)
 
 
 class Config(Settings):

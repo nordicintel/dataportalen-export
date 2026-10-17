@@ -28,4 +28,6 @@ sqlite = true
 duckdb = true
 parquet = true
 jsonld = true
-gzip_threshold_mib = 95
+compression = "xz"
+compression_level = 6
+compression_threshold_mib = 95

@@ -21,20 +21,24 @@ actual filenames, sizes, checksums, counts, source outcomes, and freshness.
 | `catalog.duckdb` | Equivalent DuckDB tables |
 | `parquet/<table>.parquet` | One Parquet file per logical table |
 | `jsonld/<catalog-id>.jsonld` | Embedded JSON-LD context and source-qualified named graphs |
-| `source_records.jsonl.gz` | Complete current source variants, RDF, and incremental state |
+| `source_records.jsonl.xz` | Complete current source variants, RDF, and incremental state |
 | `raw/dataportal.rdf.gz` | Original national RDF dump, including material outside extracted entities |
 
-Files above the configured size threshold are gzip-compressed. Decompress a
-`.db.gz` or `.duckdb.gz` before opening it. JSONL readers can stream gzip directly.
-The manifest always names the actual file. If the combined datasets JSONL is
-still too large after gzip, it is omitted explicitly and per-catalog files remain.
+Files above the configured size threshold use XZ compression by default;
+`output.compression` can select `xz` or `gzip`, and `compression_level` selects
+0–9 (default 6). Decompress a `.db.xz` or
+`.duckdb.xz` before opening it. Python's standard-library `lzma` reads XZ files;
+`gzip` reads the optional `.gz` alternative. Compression changes no database
+tables, indexes, relationships, or metadata. The manifest names the actual files.
+If the combined datasets JSONL is still too large after compression, it is
+omitted explicitly and per-catalog files remain.
 Other required files exceeding GitHub's limit prevent publication.
 
 ```python
-import gzip
+import lzma
 import json
 
-with gzip.open("data/source_records.jsonl.gz", "rt", encoding="utf-8") as records:
+with lzma.open("data/source_records.jsonl.xz", "rt", encoding="utf-8") as records:
     first = json.loads(next(records))
     print(first["source"], first["root_uri"], first["stale"])
 ```
@@ -53,7 +57,7 @@ uv run python -m dataportalen_export --validate
 
 Operational settings live in [`config.toml`](config.toml): active formats,
 source selection, concurrency, timeouts, retry attempts, logging levels,
-output path, gzip threshold, and daily time/timezone. Paths resolve relative to
+output path, compression method/threshold, and daily time/timezone. Paths resolve relative to
 the configuration file, independently of the current working directory.
 `--config` selects another TOML file for a deliberate separate run.
 

@@ -1,5 +1,5 @@
-import gzip
 import json
+import lzma
 import sqlite3
 from pathlib import Path
 
@@ -69,7 +69,7 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     for subject, predicate, obj, _ in linked.quads((None, None, None, None)):
         represented.add((subject, predicate, obj))
     assert isomorphic(represented, graph)
-    with gzip.open(path / "source_records.jsonl.gz", "rt", encoding="utf-8") as stream:
+    with lzma.open(path / "source_records.jsonl.xz", "rt", encoding="utf-8") as stream:
         assert "rdf" in json.loads(next(stream))
     restored = CurrentState.load(path)
     assert restored.records.keys() == state.records.keys()
@@ -89,6 +89,26 @@ def test_export_failure_preserves_previous_directory(tmp_path, monkeypatch):
         write_products(state, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (config.output.directory / "manifest.json").read_bytes() == before
     assert list(tmp_path.glob(".export-*/data"))
+
+
+def test_xz_products_are_readable_and_reusable(tmp_path):
+    state, _ = fixture_state()
+    config = Config()
+    config.output.directory = tmp_path / "data"
+    config.output.compression = "xz"
+    config.output.compression_threshold_mib = 0.001
+    write_products(state, config, [], attempted_at="2026-10-17T07:00:00+00:00")
+    path = config.output.directory
+    before = (path / "catalog.db.xz").read_bytes()
+    database = tmp_path / "unpacked.db"
+    database.write_bytes(lzma.decompress(before))
+    with sqlite3.connect(database) as db:
+        assert db.execute("select count(*) from datasets").fetchone()[0] == 1
+    restored = CurrentState.load(path)
+    assert restored.records.keys() == state.records.keys()
+    write_products(restored, config, [], attempted_at="2026-10-18T07:00:00+00:00")
+    assert (path / "catalog.db.xz").read_bytes() == before
+    validate_products(path)
 
 
 def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
