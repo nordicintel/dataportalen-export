@@ -93,6 +93,7 @@ retain their text, datatype, and language, and resource objects retain reference
 The original RDF preserves graph detail, including supporting blank nodes.
 Dates accept ISO years (`2022`), year-months (`2006-09`), full dates, and timestamps.
 Reduced precision stays intact; timestamps use `T` and explicit supplied offsets.
+Swedish written dates such as `10 juni 2020` normalize to `2020-06-10`.
 Byte counts accept space-grouped digits such as `155 648`, including nonbreaking spaces.
 Unparseable optional dates or numbers have null typed projections while their
 source values remain available. Source licenses and attribution are preserved;

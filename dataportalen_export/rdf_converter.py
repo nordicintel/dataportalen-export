@@ -119,11 +119,17 @@ def date_projection(candidates, node):
             date(*(parts + [1] * (3 - len(parts))))
             # Validate without inventing a month/day that the source did not supply.
             return value
+        if match := re.fullmatch(
+            r"([0-9]{1,2})\s+([a-zåäö]+)\s+([0-9]{4})", value.casefold()
+        ):
+            months = "januari februari mars april maj juni juli augusti september oktober november december".split()
+            day, month, year = match.groups()
+            return date(int(year), months.index(month) + 1, int(day)).isoformat()
         if "T" in value or " " in value:
             return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
         return date.fromisoformat(value).isoformat()
     except ValueError:
-        log.warning("Retained invalid date %s on %s", value, node)
+        log.warning("Retained unparsed date %s on %s", value, node)
         return None
 
 
