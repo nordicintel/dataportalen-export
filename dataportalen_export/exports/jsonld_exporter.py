@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from rdflib import BNode, Graph
 
-from dataportalen_export.exports.jsonl_exporter import rows_digest
+from dataportalen_export.exports.jsonl_exporter import catalog_names, rows_digest
 from dataportalen_export.rdf_converter import parse_rdf
 from dataportalen_export.rdf_graph import canonical_graph
 from dataportalen_export.schema import json_text
@@ -50,9 +50,9 @@ class JsonldExporter:
             for catalog in owner_catalogs.get(identifier, ()):
                 by_catalog[catalog].add(record)
         # Source-qualified named graphs retain conflicting variants independently.
-        for catalog in sorted(entities["catalogs"]):
+        for catalog, name in catalog_names(entities["catalogs"]).items():
             if reuse and reuse(
-                f"jsonld/{catalog}.jsonld",
+                f"jsonld/{name}.jsonld",
                 rows_digest(
                     (record_id, state.records[record_id].digest)
                     for record_id in sorted(by_catalog[catalog])
@@ -80,7 +80,7 @@ class JsonldExporter:
                 body.pop("@context", None)
                 nodes = stable_jsonld(body.get("@graph", [body]))
                 graphs.append({"@id": f"urn:source:{record_id}", "@graph": nodes})
-            (directory / f"{catalog}.jsonld").write_text(
+            (directory / f"{name}.jsonld").write_text(
                 json_text({"@context": CONTEXT, "@graph": graphs}) + "\n",
                 encoding="utf-8",
             )

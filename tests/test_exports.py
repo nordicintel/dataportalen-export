@@ -11,6 +11,7 @@ from rdflib.compare import isomorphic
 
 from dataportalen_export.config import Config
 from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
+from dataportalen_export.exports.jsonl_exporter import catalog_names
 from dataportalen_export.exports.jsonld_exporter import JsonldExporter
 from dataportalen_export.exports.products import validate_products, write_products
 
@@ -28,6 +29,20 @@ def fixture_state():
         stamp="one",
     )
     return CurrentState({record.id: record}), graph
+
+
+def test_catalog_filenames_handle_duplicate_titles_and_unsafe_characters():
+    assert catalog_names(
+        {
+            "a": {"title": {"sv": ["Västerås stad"]}, "context_ids": ["12"]},
+            "b": {"title": {"sv": ["Västerås stad"]}, "context_ids": ["34"]},
+            "c": {"title": {"en": ["../CON"]}},
+        }
+    ) == {
+        "a": "vasteras-stad-context-12",
+        "b": "vasteras-stad-context-34",
+        "c": "catalog-con",
+    }
 
 
 def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
@@ -72,6 +87,8 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     assert dataset["title"]["fi"] == ["Väestö"]
     assert len(dataset["distributions"]) == 1
     assert dataset["catalog_ids"]
+    assert (path / "catalogs/catalog.jsonl").exists()
+    assert (path / "jsonld/catalog.jsonld").exists()
     linked = Dataset().parse(next((path / "jsonld").glob("*.jsonld")), format="json-ld")
     assert len(linked) == len(graph)
     represented = Graph()
@@ -155,8 +172,7 @@ def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
     state.records[other.id] = other
     entities, links, provenance = state.materialize()
     JsonldExporter().write(tmp_path, state, entities, links, provenance)
-    catalog = next(iter(entities["catalogs"]))
-    dataset = Dataset().parse(tmp_path / f"{catalog}.jsonld", format="json-ld")
+    dataset = Dataset().parse(tmp_path / "catalog.jsonld", format="json-ld")
     blank_sets = [
         {node for triple in graph for node in triple if isinstance(node, BNode)}
         for graph in dataset.graphs()
@@ -174,6 +190,16 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
         ),
         format="turtle",
     )
+    from rdflib import Literal, URIRef
+    from rdflib.namespace import DCTERMS
+
+    other_graph.set(
+        (
+            URIRef("https://other.example.org/catalog"),
+            DCTERMS.title,
+            Literal("Other catalog"),
+        )
+    )
     other = make_record(
         other_graph,
         source="dataportal",
@@ -186,9 +212,9 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
     config = Config()
     config.output.directory = tmp_path / "data"
     write_products(state, config, [], attempted_at="first")
-    other_catalog = next(e["id"] for e in other.entities if e["kind"] == "catalogs")
+    other_catalog = "other-catalog"
     unchanged_paths = [
-        config.output.directory / "catalogs" / other_catalog / "datasets.jsonl",
+        config.output.directory / "catalogs" / f"{other_catalog}.jsonl",
         config.output.directory / "jsonld" / f"{other_catalog}.jsonld",
         config.output.directory / "parquet" / "distributions.parquet",
     ]

@@ -16,13 +16,18 @@ actual filenames, sizes, checksums, counts, source outcomes, and freshness.
 | --- | --- |
 | `datasets.jsonl` | One canonical dataset per line, including distributions, catalog IDs, and source-record IDs |
 | `catalogs.jsonl`, `dataset_series.jsonl`, `distributions.jsonl`, `data_services.jsonl`, `publishers.jsonl` | Separate object types |
-| `catalogs/<id>/datasets.jsonl` | Datasets belonging to one underlying catalog |
+| `catalogs/<catalog-name>.jsonl` | Datasets belonging to one underlying catalog, e.g. `emmaboda-kommun.jsonl` |
 | `catalog.db` | SQLite with explicit tables and relationships |
 | `catalog.duckdb` | Equivalent DuckDB tables |
 | `parquet/<table>.parquet` | One Parquet file per logical table |
-| `jsonld/<catalog-id>.jsonld` | Embedded JSON-LD context and source-qualified named graphs |
+| `jsonld/<catalog-name>.jsonld` | Embedded JSON-LD context and source-qualified named graphs |
 | `source_records.jsonl.xz` | Complete current source variants, RDF, and incremental state |
 | `raw/dataportal.rdf.gz` | Original national RDF dump, including material outside extracted entities |
+
+Browse [`data/catalogs/`](data/catalogs/) by catalog name. Filenames use the Swedish
+title when available. Duplicate names include their source context ID (or a numeric
+suffix). Exact identities remain in the records; `manifest.json`'s `catalog_files`
+maps each catalog ID to its JSONL and JSON-LD downloads, including compression suffixes.
 
 Files above the configured size threshold use XZ compression by default;
 `output.compression` can select `xz` or `gzip`, and `compression_level` selects

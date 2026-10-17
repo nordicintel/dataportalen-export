@@ -1,7 +1,42 @@
 import hashlib
-from collections import defaultdict
+import re
+import unicodedata
+from collections import Counter, defaultdict
 
 from dataportalen_export.schema import json_text
+
+
+def catalog_names(catalogs):
+    """Readable file labels; exact catalog identities remain in the records."""
+    bases = {}
+    for identifier, catalog in sorted(catalogs.items()):
+        titles = catalog["title"]
+        label = next(
+            (
+                value
+                for lang in ("sv", "sv-SE", "und", "en", *sorted(titles))
+                for value in titles.get(lang, [])
+                if value.strip()
+            ),
+            catalog.get("uri") or "catalog",
+        )
+        label = unicodedata.normalize("NFKD", label).encode("ascii", "ignore").decode()
+        bases[identifier] = (
+            re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")[:100] or "catalog"
+        )
+    counts, used, names = Counter(bases.values()), set(), {}
+    for identifier, base in bases.items():
+        contexts = catalogs[identifier].get("context_ids", [])
+        if counts[base] > 1 and contexts:
+            base += "-context-" + re.sub(r"[^a-z0-9-]", "-", str(contexts[0]).lower())
+        if re.fullmatch(r"con|prn|aux|nul|com[0-9]|lpt[0-9]", base):
+            base = "catalog-" + base
+        name, number = base, 2
+        while name in used:
+            name, number = f"{base}-{number}", number + 1
+        used.add(name)
+        names[identifier] = name
+    return names
 
 
 def rows_digest(rows):
@@ -63,8 +98,8 @@ class JsonlExporter:
             for identifier, catalogs in memberships.items():
                 for catalog in catalogs:
                     by_catalog[catalog].append(rows[identifier])
-            for catalog in entities["catalogs"]:
+            for catalog, name in catalog_names(entities["catalogs"]).items():
                 emit(
-                    f"catalogs/{catalog}/datasets.jsonl",
+                    f"catalogs/{name}.jsonl",
                     by_catalog[catalog],
                 )

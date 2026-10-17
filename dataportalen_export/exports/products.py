@@ -16,7 +16,11 @@ from rdflib import Dataset
 
 from dataportalen_export.current_state import SCHEMA_VERSION
 from dataportalen_export.exports.duckdb_exporter import DuckdbExporter
-from dataportalen_export.exports.jsonl_exporter import JsonlExporter, rows_digest
+from dataportalen_export.exports.jsonl_exporter import (
+    JsonlExporter,
+    catalog_names,
+    rows_digest,
+)
 from dataportalen_export.exports.jsonld_exporter import JsonldExporter
 from dataportalen_export.exports.sqlite_exporter import SqliteExporter
 from dataportalen_export.refresh import configuration_signature
@@ -289,6 +293,23 @@ def write_products(
                     "bytes": path.stat().st_size,
                     "sha256": checksum(path),
                 }
+        manifest["catalog_files"] = {
+            identifier: {
+                kind: next(
+                    (
+                        path + suffix
+                        for suffix in ("", ".gz", ".xz")
+                        if path + suffix in manifest["files"]
+                    ),
+                    None,
+                )
+                for kind, path in (
+                    ("jsonl", f"catalogs/{name}.jsonl"),
+                    ("jsonld", f"jsonld/{name}.jsonld"),
+                )
+            }
+            for identifier, name in catalog_names(entities["catalogs"]).items()
+        }
         (candidate / "manifest.json").write_text(
             json_text(manifest) + "\n", encoding="utf-8"
         )
