@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/388/resource/2","@type":"dcat:Catalog","dct:title":"Ljusdals kommun"}],"@id":"urn:source:cd56d685ac0695facff93c2b52460510a58c7854a3aeede667712a7d9671b943"}]}

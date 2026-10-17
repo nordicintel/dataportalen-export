@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/267/resource/2","@type":"dcat:Catalog","dct:title":"Krokoms kommun"}],"@id":"urn:source:47e141cf1be64f3196f81a9ddc8ec9f1a4a69133f51de3a364521d1fdf77790c"}]}

@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/269/resource/2","@type":"dcat:Catalog","dct:title":"Köpings kommun"}],"@id":"urn:source:739ac9880de1f388266ef57a6acdb72df0b9402a2b080e1b696bc71a3c17887c"}]}

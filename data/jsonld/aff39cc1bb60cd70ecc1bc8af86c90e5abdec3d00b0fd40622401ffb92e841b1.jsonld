@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/35/resource/2","@type":"dcat:Catalog","dct:title":"Vadstena kommun"}],"@id":"urn:source:be8525f9019cc8a15c41ec4dcf60bd8df3cf11e2782885ac59c6f2883349f788"}]}

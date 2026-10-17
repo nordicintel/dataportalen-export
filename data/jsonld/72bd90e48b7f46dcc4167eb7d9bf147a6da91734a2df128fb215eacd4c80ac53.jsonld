@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/556/resource/2","@type":"dcat:Catalog","dct:title":"Hofors kommun"}],"@id":"urn:source:33ac3077554aafea48878f0efe8abaf9e8d67069a844933e4ed3bed44b27a39e"}]}

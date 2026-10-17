@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/529/resource/2","@type":"dcat:Catalog","dct:title":"Fagersta kommun"}],"@id":"urn:source:595b8da3c1d9928cd40e87e9bde3596bb4b9929571a5fc9b931ae2c7d2bbc0dc"}]}

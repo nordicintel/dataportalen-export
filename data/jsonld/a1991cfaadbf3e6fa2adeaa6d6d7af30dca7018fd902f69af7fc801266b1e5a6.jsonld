@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/392/resource/2","@type":"dcat:Catalog","dct:title":"Leksands kommun"}],"@id":"urn:source:de4361c144f0101c73a190b4648c00289a202f1c8c6d351821102b2f2308c52e"}]}

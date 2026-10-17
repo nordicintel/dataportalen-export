@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/450/resource/2","@type":"dcat:Catalog","dct:title":"Kinda kommun"}],"@id":"urn:source:5a3072cd4934bf5e1a8f4f7fd466ac10c89ab614e94ca2bcd4d409d8f571e3e0"}]}

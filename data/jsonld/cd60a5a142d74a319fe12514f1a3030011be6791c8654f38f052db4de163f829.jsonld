@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/393/resource/2","@type":"dcat:Catalog","dct:title":"Laxå kommun"}],"@id":"urn:source:b9790b78d5ab4fa4ed910a7756181f9312dce3fa0343e5890b29923f76c01e3f"}]}

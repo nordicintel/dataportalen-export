@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/225/resource/2","@type":"dcat:Catalog","dct:title":"Mora tingsrätt"}],"@id":"urn:source:f1a88e913bcc530e22ba40c6c9cf5076055849aa03c456a0d9f3fd04149892fb"}]}

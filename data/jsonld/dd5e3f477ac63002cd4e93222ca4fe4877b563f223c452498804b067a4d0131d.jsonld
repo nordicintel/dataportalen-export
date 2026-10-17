@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/496/resource/2","@type":"dcat:Catalog","dct:title":"Norsjö kommun"}],"@id":"urn:source:e89c6b187772f598b0e8c6161879df9a5cab31aa9f8919c928a8769ef05d3e33"}]}

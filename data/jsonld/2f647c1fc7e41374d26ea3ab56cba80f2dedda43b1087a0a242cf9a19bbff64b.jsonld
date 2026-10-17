@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/186/resource/2","@type":"dcat:Catalog","dct:title":"Region Halland"}],"@id":"urn:source:3e6f952c45c577d45ceb5dd17cd5124d2aec33a87092f819c603049a5100ba52"}]}

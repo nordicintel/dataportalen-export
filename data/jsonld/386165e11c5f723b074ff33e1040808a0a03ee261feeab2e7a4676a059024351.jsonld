@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/603/resource/2","@type":"dcat:Catalog","dct:title":"Domarnämnden"}],"@id":"urn:source:62d48bc31fce2c9a91f7ff3c88f00a7c5080716346a968e467d60c8f8257e4a9"}]}

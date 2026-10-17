@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/18/resource/2","@type":"dcat:Catalog","dct:title":"Vellinge kommun"}],"@id":"urn:source:08d1f45bbdc50c4cd7f862ae3406f28abc788766bd9a1acd41a526e5163bf7ee"}]}

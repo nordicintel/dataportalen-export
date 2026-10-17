@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/243/resource/2","@type":"dcat:Catalog","dct:title":"Lantmäteriet"}],"@id":"urn:source:96e4c33eab1ce3f9ab76657f77bd5fab9b32f74873f2c313180c4974066cb3d2"}]}

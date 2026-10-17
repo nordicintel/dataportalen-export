@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/623/resource/2","@type":"dcat:Catalog","dct:title":"Arboga kommun"}],"@id":"urn:source:472fa16a565a7e9619ab4cb2e8ad5a39d04b48a1d43c6f45d6c008d85f28ee6d"}]}

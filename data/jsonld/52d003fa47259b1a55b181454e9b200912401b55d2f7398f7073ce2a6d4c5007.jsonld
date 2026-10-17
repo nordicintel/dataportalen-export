@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/375/resource/2","@type":"dcat:Catalog","dct:title":"Öckerö kommun"}],"@id":"urn:source:ff68f714473575ddebcc51f3ff51ef296ab155e5aba1f214f7ed54ea3b261d29"}]}

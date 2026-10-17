@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/573/resource/2","@type":"dcat:Catalog","dct:title":"Gävle tingsrätt"}],"@id":"urn:source:1220a8d67d6dc976b255b8d91d9d67dbe5e344f0abe985523a07f7a54570d9ea"}]}

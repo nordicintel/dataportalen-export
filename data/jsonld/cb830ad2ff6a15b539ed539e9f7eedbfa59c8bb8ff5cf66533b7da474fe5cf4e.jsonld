@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/611/resource/2","@type":"dcat:Catalog","dct:title":"Bollnäs kommun"}],"@id":"urn:source:54684150e4bf288230093effbf996ceb357be60756fac0f7d62c2f52e5d149d1"}]}

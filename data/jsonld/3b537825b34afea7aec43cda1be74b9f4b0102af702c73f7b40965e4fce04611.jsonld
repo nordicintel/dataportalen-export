@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/486/resource/1","@type":"dcat:Catalog","dct:title":"Svalövs kommun"}],"@id":"urn:source:c0ded243f116d6fc32ff3dd087b266baa5aaa4accde7ffcfb79b70288c85d347"}]}

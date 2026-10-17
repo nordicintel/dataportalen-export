@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/234/resource/2","@type":"dcat:Catalog","dct:title":"Luleå kommun"}],"@id":"urn:source:75a6c60690b1086eb5400776313a3ae0eff9ea0992c9ca932820878b0f6eaf6c"}]}

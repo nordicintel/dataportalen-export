@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/443/resource/2","@type":"dcat:Catalog","dct:title":"Åmåls kommun"}],"@id":"urn:source:363d8685809f21716bed5c5b1f00ea23af179bae34a9a3713bbdd8f0e64fdc50"}]}

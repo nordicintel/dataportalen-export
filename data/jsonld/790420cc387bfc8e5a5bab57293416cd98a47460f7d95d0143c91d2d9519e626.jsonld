@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/354/resource/2","@type":"dcat:Catalog","dct:title":"Sorsele kommun"}],"@id":"urn:source:939ff04f7e1726992f3e48d9e26cdbcc09145657d1ba90924801fcd8a522daeb"}]}

@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/232/resource/2","@type":"dcat:Catalog","dct:title":"Lunds tingsrätt"}],"@id":"urn:source:24e4e2576fa48b4bbfc53d1a57df800c2a3a79e12a7fd805f593e5205961f1b9"}]}

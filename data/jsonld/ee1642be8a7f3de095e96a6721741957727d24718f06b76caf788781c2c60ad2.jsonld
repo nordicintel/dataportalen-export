@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/400/resource/2","@type":"dcat:Catalog","dct:title":"Kramfors kommun"}],"@id":"urn:source:e8b6cc79b167e9a21a4d86b5180ea44992d739b28823a5b97222baeefde34b69"}]}

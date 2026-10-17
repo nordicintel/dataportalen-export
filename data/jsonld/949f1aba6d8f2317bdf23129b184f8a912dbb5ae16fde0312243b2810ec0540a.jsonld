@@ -1,0 +1,1 @@
+{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/448/resource/2","@type":"dcat:Catalog","dct:title":"Knivsta kommun"}],"@id":"urn:source:9b8af77fd41531090aae21ca421e7b7f7a886078e35c28099ef690a38e7b2275"}]}
