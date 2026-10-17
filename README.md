@@ -10,6 +10,7 @@ The optional [`data/catalog.db.gz`](data/catalog.db.gz) is rebuilt from that fil
 uv sync --locked
 uv run python scripts/scrape.py
 uv run python scripts/build_database.py
+uv run python scripts/extract_hosts.py
 ```
 
 The database command works independently of `database.enabled`. It needs an existing
@@ -37,6 +38,7 @@ All operational settings live in [`config.toml`](config.toml):
 | `schedule.time` | Local daily time, `HH:MM`; defaults to `06:00` |
 | `schedule.timezone` | IANA timezone; defaults to `Europe/Stockholm` |
 | `database.enabled` | Also rebuild SQLite during Harvest; defaults to true |
+| `hosts.enabled` | Write sorted unique URL hostnames to `data/hosts.txt` during Harvest; defaults to true |
 | `database.gzip_level` | SQLite gzip compression level; defaults to 6 |
 
 Catalog and country selections form a **union**. A dataset matching both is written
@@ -126,3 +128,12 @@ uv run ruff format --check .
 ```
 
 Tests use mocked external HTTP pages and real gzip and SQLite files.
+
+## URL hosts
+
+`data/hosts.txt` contains one lowercase hostname per line, sorted and deduplicated.
+Extraction scans every JSONL key and nested value, including URLs embedded in descriptions
+and HTML. Subdomains are retained; schemes, credentials, ports, paths, queries and
+fragments are removed. Email addresses and malformed URLs are ignored. No network
+requests or SQLite rebuild are needed: JSONL contains the complete database source.
+Set `[hosts] enabled = false` to skip extraction and keep the previous file unchanged.

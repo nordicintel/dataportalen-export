@@ -36,6 +36,9 @@ jobs:
         id: scrape
         if: steps.schedule.outputs.due == 'true'
         run: /usr/bin/time -v uv run --no-dev python scripts/scrape.py
+      - name: Extract optional URL hosts
+        if: steps.schedule.outputs.due == 'true'
+        run: uv run --no-dev python scripts/extract_hosts.py
       - name: Rebuild optional database
         id: database
         if: steps.schedule.outputs.due == 'true' && steps.schedule.outputs.database == 'true'
@@ -48,6 +51,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/datasets.jsonl.gz
+          if [ -f data/hosts.txt ]; then git add data/hosts.txt; fi
           if [ "$DATABASE_OUTCOME" = 'success' ]; then git add data/catalog.db.gz; fi
           git diff --cached --quiet && exit 0
           git commit -m 'Refresh dataset downloads'

@@ -19,3 +19,6 @@ timezone = "Europe/Stockholm"
 [database]
 enabled = true
 gzip_level = 6
+
+[hosts]
+enabled = true
