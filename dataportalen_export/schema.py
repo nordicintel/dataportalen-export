@@ -16,7 +16,7 @@ def json_text(value):
 
 
 COMMON = [
-    ("id", "TEXT PRIMARY KEY"),
+    ("id", "TEXT PRIMARY KEY NOT NULL"),
     ("uri", "TEXT"),
     ("title_json", "TEXT NOT NULL"),
     ("description_json", "TEXT NOT NULL"),
@@ -80,7 +80,7 @@ def tables_for(state, entities, links, provenance):
             [(a, b) for name, a, b in links if name == table],
         )
     columns = [
-        ("id", "TEXT PRIMARY KEY"),
+        ("id", "TEXT PRIMARY KEY NOT NULL"),
         ("source", "TEXT NOT NULL"),
         ("native_id", "TEXT NOT NULL"),
         ("scope", "TEXT NOT NULL"),
@@ -135,7 +135,7 @@ def tables_for(state, entities, links, provenance):
         )
     tables["harvest_status"] = (
         [
-            ("scope", "TEXT PRIMARY KEY"),
+            ("scope", "TEXT PRIMARY KEY NOT NULL"),
             ("source", "TEXT NOT NULL"),
             ("record_count", "BIGINT NOT NULL"),
             ("stale_count", "BIGINT NOT NULL"),

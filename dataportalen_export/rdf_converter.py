@@ -118,7 +118,7 @@ def date_value(graph, node, predicate):
             date.fromisoformat(value)
         return value
     except ValueError:
-        log.debug("Retained invalid date %s on %s", value, node)
+        log.warning("Retained invalid date %s on %s", value, node)
         return None
 
 
@@ -202,6 +202,10 @@ class RdfConverter:
                         )
                     except ValueError:
                         pass
+                    if number is None:
+                        log.warning(
+                            "Retained invalid byte size %s on %s", size[0], node
+                        )
                 fields.update(
                     access_urls=values(graph, node, DCAT.accessURL),
                     download_urls=values(graph, node, DCAT.downloadURL),

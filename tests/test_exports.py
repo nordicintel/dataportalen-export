@@ -36,6 +36,14 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     path = config.output.directory
     validate_products(path)
     with sqlite3.connect(path / "catalog.db") as db:
+        assert (
+            next(
+                row
+                for row in db.execute("pragma table_info(datasets)")
+                if row[1] == "id"
+            )[3]
+            == 1
+        )
         assert db.execute("select count(*) from datasets").fetchone()[0] == 1
         assert (
             db.execute("select count(*) from dataset_distributions").fetchone()[0] == 1
