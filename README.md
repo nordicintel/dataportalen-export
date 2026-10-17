@@ -256,3 +256,43 @@ uv run ruff format --check .
 Tests use a small RDF fixture, external HTTP fixtures, and actual exported files.
 They are separate from full live verification in GitHub Actions. Add a failing
 behavioral test before a meaningful change, then implement only that behavior.
+
+## Verified publication — 2026-10-17
+
+The [full hosted harvest](https://github.com/nordicintel/dataportalen-export/actions/runs/39006216783)
+published both live sources with every default format enabled. The current products contain:
+
+| Entity | Count |
+| --- | ---: |
+| Catalogs | 659 |
+| Datasets | 25,124 |
+| Dataset series | 33 |
+| Distributions | 36,882 |
+| Data services | 1,601 |
+| Publishers | 11,079 |
+
+There are 26,548 retained source records and 1,347 product files, including 19
+Parquet tables and 659 catalog files in each of JSONL and JSON-LD. Consumer
+verification opened both databases, checked foreign keys and cross-format table
+contents, read every Parquet file, parsed JSONL/JSON-LD, and confirmed coverage of
+every national dataset, series and service root. There are no failed, stale or
+skipped records, no datasets without catalog membership, and no omitted products
+in this publication. SQLite is 61,854,284 bytes compressed; DuckDB is 85,266,660
+bytes. Database tables, full JSON, original RDF, relationships and indexes remain
+intact.
+
+The [final incremental hosted run](https://github.com/nordicintel/dataportalen-export/actions/runs/39011070214)
+took 2.68 seconds for the harvest command, with 102,432 KiB peak resident memory.
+It fetched zero records and kept every product checksum unchanged. GitHub checkout
+and runner setup take additional time. The initial full harvest took 19m39s and
+5,316,700 KiB peak resident memory. The [code checks](https://github.com/nordicintel/dataportalen-export/actions/runs/39011069895)
+passed Ruff and 30 deterministic tests. Scoped changes, shared descriptions,
+failure isolation and confirmed removals are tested with external HTTP fixtures;
+the full harvest and repeat-run measurements use the live services.
+
+Some catalog resources have no dataset members in the source metadata. One
+Skatteverket partner catalog has 27 references using `%23dataset` while the
+available dataset URIs use `%2523dataset`. The counterpart datasets are present;
+the differing original URIs stay distinct, and the catalog's references remain
+in its metadata. Source date/size values that cannot be projected remain intact
+with null typed projections.
