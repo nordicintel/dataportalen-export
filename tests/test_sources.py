@@ -64,6 +64,11 @@ def test_failed_catalog_metadata_preserves_known_memberships(tmp_path):
         query = request.url.params["query"]
         if "#Catalog" in query:
             rows = [{"contextId": "context", "entryId": "catalog"}]
+            # EntryScape's unrestricted index count includes inaccessible entries.
+            if "public:true" not in query:
+                return httpx.Response(
+                    200, json={"results": 2, "resource": {"children": rows}}
+                )
         else:
             uri = "series" if "#DatasetSeries" in query else "Dataset"
             rows = [

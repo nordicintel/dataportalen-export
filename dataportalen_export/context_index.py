@@ -35,7 +35,9 @@ class ContextIndex:
                             if "id" in value
                         }
                         self.catalogs[context].append((entity["id"], members))
-        catalog_rows = await client.solr("rdfType:http\\://www.w3.org/ns/dcat#Catalog")
+        catalog_rows = await client.solr(
+            "rdfType:http\\://www.w3.org/ns/dcat#Catalog AND public:true"
+        )
         fresh_catalogs = defaultdict(list)
         failed_contexts = set()
 
