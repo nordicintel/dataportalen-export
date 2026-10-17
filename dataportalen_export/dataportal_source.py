@@ -29,6 +29,7 @@ class DataportalSource:
         cached_dump=None,
         previous_status=None,
         changed_contexts=None,
+        excluded_contexts=(),
     ):
         batch = SourceBatch("dataportal")
         previous_status = previous_status or {}
@@ -105,7 +106,12 @@ class DataportalSource:
         index = ContextIndex()
         try:
             await index.load(
-                client, batch, previous, force=force, changed_contexts=changed_contexts
+                client,
+                batch,
+                previous,
+                force=force,
+                changed_contexts=changed_contexts,
+                excluded_contexts=excluded_contexts,
             )
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
             batch.failures["dataportal:contexts"] = str(error)[:400]

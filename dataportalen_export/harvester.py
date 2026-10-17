@@ -14,7 +14,7 @@ from dataportalen_export.dataeu_source import DataEuSource
 from dataportalen_export.dataportal_source import DataportalSource
 from dataportalen_export.exports.products import write_products
 from dataportalen_export.portal_client import PortalClient
-from dataportalen_export.refresh import check_sources, configuration_signature
+from dataportalen_export.refresh import check_sources, configuration
 from dataportalen_export.schema import json_text
 
 log = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ class Harvester:
             compatible = previous_manifest.get(
                 "schema_version"
             ) == SCHEMA_VERSION and previous_manifest.get(
-                "configuration_signature"
-            ) == configuration_signature(config)
+                "configuration"
+            ) == configuration(config)
             healthy = previous_manifest.get("status") in {
                 "success",
                 "warnings",
@@ -61,6 +61,7 @@ class Harvester:
                     no_changes=True,
                     deleted_records=0,
                     reused_files=len(manifest["files"]),
+                    sqlite_changed_rows={},
                 )
                 manifest["sources"] = [
                     {**source, "fetched": 0, "reused": source["accepted_records"]}
@@ -75,7 +76,54 @@ class Harvester:
                     "No source changes: skipped state loading, retrieval, export construction and validation"
                 )
                 return manifest
-            state = CurrentState.load(config.output.directory)
+            previous = CurrentState.load(config.output.directory)
+            enabled = {
+                source
+                for source in ("dataportal", "dataeu")
+                if getattr(config.sources, source)
+            }
+            excluded_scopes = {
+                f"dataeu:{catalog}" for catalog in config.sources.exclude_eu_catalogs
+            }
+            excluded_records = {
+                key
+                for key, record in previous.records.items()
+                if record.source not in enabled
+                or record.scope in excluded_scopes
+                or (
+                    record.source == "dataportal"
+                    and record.native_id.startswith("catalog:")
+                    and record.native_id.split(":", 2)[1]
+                    in config.sources.exclude_dataportal_contexts
+                )
+            }
+            excluded_catalogs = {
+                entity["id"]
+                for key in excluded_records
+                for entity in previous.records[key].entities
+                if entity["kind"] == "catalogs"
+            }
+            state = CurrentState(
+                {
+                    key: record.model_copy(
+                        update={
+                            "catalog_ids": [
+                                identifier
+                                for identifier in record.catalog_ids
+                                if identifier not in excluded_catalogs
+                            ]
+                        }
+                    )
+                    for key, record in previous.records.items()
+                    if key not in excluded_records
+                },
+                {
+                    key: value
+                    for key, value in previous.referenced_records.items()
+                    if key not in excluded_records
+                },
+            )
+            state.deleted = len(excluded_records)
             with tempfile.TemporaryDirectory(
                 prefix="dataportalen-harvest-"
             ) as temporary:
@@ -103,6 +151,7 @@ class Harvester:
                             cached_dump=config.output.directory
                             / "raw/dataportal.rdf.gz",
                             previous_status=previous_status,
+                            excluded_contexts=config.sources.exclude_dataportal_contexts,
                             changed_contexts=check.changed_contexts
                             if source_healthy and not force
                             else None,
@@ -135,6 +184,7 @@ class Harvester:
                     attempted_at=attempted_at,
                     raw_dump=raw,
                     checkpoints=checkpoints,
+                    previous=previous,
                 )
         log.info(
             "Published current products: %s; stale=%d failures=%d",

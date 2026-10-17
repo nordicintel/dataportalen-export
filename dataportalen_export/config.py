@@ -36,9 +36,12 @@ class Schedule(Settings):
 
 class Sources(Settings):
     dataportal: bool = True
+    exclude_dataportal_contexts: list[str] = Field(default_factory=lambda: ["104"])
     dataeu: bool = True
     countries: list[str] = Field(default_factory=lambda: ["se"])
-    exclude_eu_catalogs: list[str] = Field(default_factory=lambda: ["oppnadata"])
+    exclude_eu_catalogs: list[str] = Field(
+        default_factory=lambda: ["oppnadata", "nsip-se"]
+    )
 
 
 class Harvest(Settings):
@@ -66,12 +69,11 @@ class Output(Settings):
     entity_jsonl: bool = True
     catalog_jsonl: bool = True
     sqlite: bool = True
-    duckdb: bool = True
     duckdb_memory_limit_mb: int = Field(default=512, ge=128)
     parquet: bool = True
     jsonld: bool = True
     compression: Literal["xz", "gzip"] = "xz"
-    compression_level: int = Field(default=9, ge=0, le=9)
+    compression_level: int = Field(default=6, ge=0, le=9)
     compression_threshold_mib: float = Field(default=95, gt=0, le=95)
 
 

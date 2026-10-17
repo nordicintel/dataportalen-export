@@ -6,19 +6,34 @@ from pathlib import Path
 
 import duckdb
 import pytest
-from rdflib import BNode, Dataset, Graph
+from rdflib import BNode, Dataset, Graph, Literal, URIRef
 from rdflib.compare import isomorphic
+from rdflib.namespace import DCTERMS
 
 from dataportalen_export.config import Config
 from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
 from dataportalen_export.exports.jsonl_exporter import catalog_names
-from dataportalen_export.exports.jsonld_exporter import JsonldExporter
+from dataportalen_export.exports.jsonld_exporter import catalog_records, write_jsonld
 from dataportalen_export.exports.products import validate_products, write_products
 
 
 def fixture_state():
     graph = Graph().parse(
         Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
+    )
+    graph.add(
+        (
+            URIRef("https://example.org/Dataset"),
+            URIRef("http://www.w3.org/ns/dcat#landingPage"),
+            URIRef("https://example.org/landing"),
+        )
+    )
+    graph.add(
+        (
+            URIRef("https://example.org/service"),
+            DCTERMS.publisher,
+            URIRef("https://example.org/publisher"),
+        )
     )
     record = make_record(
         graph,
@@ -63,7 +78,23 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
         )
         assert db.execute("select count(*) from datasets").fetchone()[0] == 1
         assert (
-            db.execute("select count(*) from dataset_distributions").fetchone()[0] == 1
+            db.execute(
+                "select count(*) from distributions where dataset_id is not null"
+            ).fetchone()[0]
+            == 1
+        )
+        assert (
+            db.execute(
+                "select p.title from data_services s join publishers p on p.id=s.publisher_id"
+            ).fetchone()[0]
+            == "Publisher"
+        )
+        assert "homepages_json" not in {
+            row[1] for row in db.execute("pragma table_info(datasets)")
+        }
+        assert (
+            db.execute("select landing_pages_json from datasets").fetchone()[0]
+            == '["https://example.org/landing"]'
         )
         assert not db.execute("pragma foreign_key_check").fetchall()
         expected_tables = {
@@ -72,21 +103,35 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
                 "SELECT name FROM sqlite_master WHERE type='table'"
             ).fetchall()
         }
-    with duckdb.connect(str(path / "catalog.duckdb"), read_only=True) as db:
+        assert set(expected_tables) == {
+            "catalogs",
+            "datasets",
+            "dataset_series",
+            "distributions",
+            "data_services",
+            "publishers",
+        }
+    with duckdb.connect() as db:
         for name, rows in expected_tables.items():
-            assert sorted(db.execute(f'SELECT * FROM "{name}"').fetchall()) == rows
-        assert db.execute("select count(*) from datasets").fetchone()[0] == 1
-        assert (
-            db.execute(
-                "select count(*) from read_parquet(?)",
-                [str(path / "parquet/datasets.parquet")],
-            ).fetchone()[0]
-            == 1
-        )
+            assert (
+                sorted(
+                    db.execute(
+                        "SELECT * FROM read_parquet(?)",
+                        [str(path / "parquet" / f"{name}.parquet")],
+                    ).fetchall()
+                )
+                == rows
+            )
+    assert not (path / "catalog.duckdb").exists()
+    assert all(
+        set(info) == {"bytes"}
+        for info in json.loads((path / "manifest.json").read_text())["files"].values()
+    )
     dataset = json.loads((path / "datasets.jsonl").read_text(encoding="utf-8"))
     assert dataset["title"]["fi"] == ["Väestö"]
     assert len(dataset["distributions"]) == 1
-    assert dataset["catalog_ids"]
+    assert dataset["catalog_id"]
+    assert dataset["distributions"][0]["dataset_id"] == dataset["id"]
     assert (path / "catalogs/catalog.jsonl").exists()
     assert (path / "jsonld/catalog.jsonld").exists()
     linked = Dataset().parse(next((path / "jsonld").glob("*.jsonld")), format="json-ld")
@@ -95,10 +140,36 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     for subject, predicate, obj, _ in linked.quads((None, None, None, None)):
         represented.add((subject, predicate, obj))
     assert isomorphic(represented, graph)
-    with lzma.open(path / "source_records.jsonl.xz", "rt", encoding="utf-8") as stream:
+    with lzma.open(
+        next((path / "source_records").rglob("*.xz")), "rt", encoding="utf-8"
+    ) as stream:
         assert "rdf" in json.loads(next(stream))
     restored = CurrentState.load(path)
     assert restored.records.keys() == state.records.keys()
+
+
+def test_shared_distributions_keep_each_parent_in_the_distribution_table(tmp_path):
+    state, graph = fixture_state()
+    graph.parse(
+        data="""<https://example.org/another> a <http://www.w3.org/ns/dcat#Dataset>;
+      <http://www.w3.org/ns/dcat#distribution> <https://example.org/distribution> .""",
+        format="turtle",
+    )
+    record = make_record(
+        graph,
+        source="dataportal",
+        native_id="fixture",
+        scope="dataportal",
+        root_uri="https://example.org/Dataset",
+        stamp="two",
+    )
+    config = Config()
+    config.output.directory = tmp_path / "data"
+    write_products(CurrentState({record.id: record}), config, [], attempted_at="one")
+    with sqlite3.connect(config.output.directory / "catalog.db") as db:
+        assert db.execute(
+            "select count(*),count(distinct id),count(distinct dataset_id) from distributions"
+        ).fetchone() == (2, 1, 2)
 
 
 def test_export_failure_preserves_previous_directory(tmp_path, monkeypatch):
@@ -110,11 +181,10 @@ def test_export_failure_preserves_previous_directory(tmp_path, monkeypatch):
     # An invalid polymorphic reference is rejected before replacing any output.
     record = next(iter(state.records.values()))
     record.entities[0]["id"] = ""
-    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     with pytest.raises(ValueError):
         write_products(state, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (config.output.directory / "manifest.json").read_bytes() == before
-    assert list(tmp_path.glob(".export-*/data"))
+    assert not list(tmp_path.glob(".export-*"))
 
 
 def test_complete_source_failure_is_visible_with_usable_other_source_products(tmp_path):
@@ -152,10 +222,11 @@ def test_xz_products_are_readable_and_reusable(tmp_path):
         assert db.execute("select count(*) from datasets").fetchone()[0] == 1
     restored = CurrentState.load(path)
     assert restored.records.keys() == state.records.keys()
-    os.utime(path / "source_records.jsonl.xz", (1000000000, 1000000000))
+    shard = next((path / "source_records").rglob("*.xz"))
+    os.utime(shard, (1000000000, 1000000000))
     write_products(restored, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (path / "catalog.db.xz").read_bytes() == before
-    assert (path / "source_records.jsonl.xz").stat().st_mtime == 1000000000
+    assert shard.stat().st_mtime == 1000000000
     validate_products(path)
 
 
@@ -171,7 +242,8 @@ def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
     )
     state.records[other.id] = other
     entities, links, provenance = state.materialize()
-    JsonldExporter().write(tmp_path, state, entities, links, provenance)
+    for catalog, records in catalog_records(state, entities, links, provenance).items():
+        write_jsonld(tmp_path / "catalog.jsonld", state, records)
     dataset = Dataset().parse(tmp_path / "catalog.jsonld", format="json-ld")
     blank_sets = [
         {node for triple in graph for node in triple if isinstance(node, BNode)}
@@ -190,8 +262,7 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
         ),
         format="turtle",
     )
-    from rdflib import Literal, URIRef
-    from rdflib.namespace import DCTERMS
+    from rdflib import URIRef
 
     other_graph.set(
         (
@@ -221,9 +292,8 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
     before = {path: path.read_bytes() for path in unchanged_paths}
     for path in unchanged_paths:
         os.utime(path, (1000000000, 1000000000))
+    previous = CurrentState(dict(state.records))
     # One dataset changes; the independent catalog's published files must be reused.
-    from rdflib import Literal, URIRef
-    from rdflib.namespace import DCTERMS
 
     graph.set(
         (URIRef("https://example.org/Dataset"), DCTERMS.title, Literal("Changed"))
@@ -249,9 +319,26 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
         )
         return original_open(path, *args, **kwargs)
 
+    original_connect = sqlite3.connect
+    statements = []
+
+    def traced_connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
     with monkeypatch.context() as patch:
         patch.setattr(Path, "open", guarded_open)
-        write_products(state, config, [], attempted_at="second")
+        patch.setattr(sqlite3, "connect", traced_connect)
+        result = write_products(
+            state, config, [], attempted_at="second", previous=previous
+        )
+        assert result["sqlite_changed_rows"]["datasets"] == 1
+        assert sum(result["sqlite_changed_rows"].values()) == 1
+    assert not any(
+        "CREATE TABLE" in sql.upper() or "DROP TABLE" in sql.upper()
+        for sql in statements
+    )
     for path in unchanged_paths:
         assert path.read_bytes() == before[path]
         assert path.stat().st_mtime == 1000000000

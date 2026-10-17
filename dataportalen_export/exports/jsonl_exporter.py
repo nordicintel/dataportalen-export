@@ -1,9 +1,8 @@
-import hashlib
 import re
 import unicodedata
 from collections import Counter, defaultdict
 
-from dataportalen_export.schema import json_text
+from dataportalen_export.schema import inline_relations, json_text, object_json
 
 
 def catalog_names(catalogs):
@@ -39,13 +38,6 @@ def catalog_names(catalogs):
     return names
 
 
-def rows_digest(rows):
-    digest = hashlib.sha256()
-    for row in rows:
-        digest.update((json_text(row) + "\n").encode())
-    return digest.hexdigest()
-
-
 def write_jsonl(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as stream:
@@ -53,53 +45,61 @@ def write_jsonl(path, rows):
             stream.write(json_text(row) + "\n")
 
 
-class JsonlExporter:
-    def write(self, directory, entities, links, provenance, settings, *, reuse=None):
-        def emit(name, items):
-            items = list(items)
-            if reuse and reuse(name, rows_digest(items)):
-                return
-            write_jsonl(directory / name, items)
-
-        memberships, distributions, sources = (
-            defaultdict(list),
-            defaultdict(list),
-            defaultdict(list),
-        )
-        for table, left, right in links:
-            if table == "catalog_datasets":
-                memberships[right].append(left)
-            elif table == "dataset_distributions":
-                distributions[left].append(entities["distributions"][right])
-        for kind, identifier, record in provenance:
-            sources[(kind, identifier)].append(record)
-        rows = {}
-        for identifier, entity in sorted(entities["datasets"].items()):
-            rows[identifier] = {
-                **entity,
-                "catalog_ids": sorted(memberships[identifier]),
-                "distributions": distributions[identifier],
-                "source_record_ids": sorted(sources[("datasets", identifier)]),
-            }
-        if settings.combined_jsonl:
-            emit("datasets.jsonl", rows.values())
-        if settings.entity_jsonl:
-            for kind, items in entities.items():
-                if kind != "datasets":
-                    emit(
-                        f"{kind}.jsonl",
-                        (
-                            {**entity, "source_record_ids": sources[(kind, identifier)]}
-                            for identifier, entity in sorted(items.items())
-                        ),
-                    )
-        if settings.catalog_jsonl:
-            by_catalog = defaultdict(list)
-            for identifier, catalogs in memberships.items():
-                for catalog in catalogs:
-                    by_catalog[catalog].append(rows[identifier])
-            for catalog, name in catalog_names(entities["catalogs"]).items():
-                emit(
-                    f"catalogs/{name}.jsonl",
-                    by_catalog[catalog],
+def jsonl_products(entities, links, provenance, settings):
+    memberships, distributions, sources = (
+        defaultdict(list),
+        defaultdict(list),
+        defaultdict(list),
+    )
+    outgoing, incoming = defaultdict(list), defaultdict(list)
+    publishers = {
+        entity["uri"]: identifier
+        for identifier, entity in entities["publishers"].items()
+        if entity.get("uri")
+    }
+    for table, left, right in links:
+        outgoing[table, left].append(right)
+        incoming[table, right].append(left)
+        if table == "catalog_datasets":
+            memberships[right].append(left)
+    for table, left, right in links:
+        if table == "dataset_distributions":
+            entity = entities["distributions"][right]
+            distributions[left].append(
+                {
+                    **object_json(entity),
+                    **inline_relations(entity, outgoing, incoming, publishers),
+                }
+            )
+    for kind, identifier, record in provenance:
+        sources[(kind, identifier)].append(record)
+    rows = {}
+    for identifier, entity in sorted(entities["datasets"].items()):
+        rows[identifier] = {
+            **object_json(entity),
+            **inline_relations(entity, outgoing, incoming, publishers),
+            "distributions": distributions[identifier],
+            "source_record_ids": sorted(sources[("datasets", identifier)]),
+        }
+    if settings.combined_jsonl:
+        yield "datasets.jsonl", list(rows.values())
+    if settings.entity_jsonl:
+        for kind, items in entities.items():
+            if kind != "datasets":
+                yield (
+                    f"{kind}.jsonl",
+                    [
+                        {
+                            **object_json(entity),
+                            "source_record_ids": sources[(kind, identifier)],
+                        }
+                        for identifier, entity in sorted(items.items())
+                    ],
                 )
+    if settings.catalog_jsonl:
+        by_catalog = defaultdict(list)
+        for identifier, catalogs in memberships.items():
+            for catalog in catalogs:
+                by_catalog[catalog].append(rows[identifier])
+        for catalog, name in catalog_names(entities["catalogs"]).items():
+            yield f"catalogs/{name}.jsonl", by_catalog[catalog]

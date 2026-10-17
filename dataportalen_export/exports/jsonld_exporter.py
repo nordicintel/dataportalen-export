@@ -3,7 +3,6 @@ from collections import defaultdict
 
 from rdflib import BNode, Graph
 
-from dataportalen_export.exports.jsonl_exporter import catalog_names, rows_digest
 from dataportalen_export.rdf_converter import parse_rdf
 from dataportalen_export.rdf_graph import canonical_graph
 from dataportalen_export.schema import json_text
@@ -16,74 +15,63 @@ CONTEXT = {
 }
 
 
-class JsonldExporter:
-    def write(self, directory, state, entities, links, provenance, *, reuse=None):
-        directory.mkdir(parents=True, exist_ok=True)
-        memberships = defaultdict(set)
+def catalog_records(state, entities, links, provenance):
+    memberships = defaultdict(set)
+    for table, left, right in links:
+        if table in {"catalog_datasets", "catalog_series", "catalog_services"}:
+            memberships[right].add(left)
+    # Include source variants that supply referenced descriptions separately
+    # from a dataset's own RDF (including a retained last-known publisher).
+    dependencies = defaultdict(
+        set, {key: set(value) for key, value in memberships.items()}
+    )
+    changed = bool(state.referenced_records)
+    while changed:
+        changed = False
         for table, left, right in links:
-            if table in {"catalog_datasets", "catalog_series", "catalog_services"}:
-                memberships[right].add(left)
-        # Include source variants that supply referenced descriptions separately
-        # from a dataset's own RDF (including a retained last-known publisher).
-        dependencies = defaultdict(
-            set, {key: set(value) for key, value in memberships.items()}
-        )
-        changed = bool(state.referenced_records)
-        while changed:
-            changed = False
-            for table, left, right in links:
-                if table.startswith("catalog_"):
-                    continue
-                owner, target = (
-                    (right, left) if table == "series_datasets" else (left, right)
-                )
-                before = len(dependencies[target])
-                dependencies[target].update(dependencies[owner])
-                changed |= len(dependencies[target]) != before
-        by_catalog = defaultdict(set)
-        for kind, identifier, record in provenance:
-            if kind == "catalogs":
-                by_catalog[identifier].add(record)
-            owner_catalogs = (
-                dependencies if record in state.referenced_records else memberships
-            )
-            for catalog in owner_catalogs.get(identifier, ()):
-                by_catalog[catalog].add(record)
-        # Source-qualified named graphs retain conflicting variants independently.
-        for catalog, name in catalog_names(entities["catalogs"]).items():
-            if reuse and reuse(
-                f"jsonld/{name}.jsonld",
-                rows_digest(
-                    (record_id, state.records[record_id].digest)
-                    for record_id in sorted(by_catalog[catalog])
-                ),
-            ):
+            if table.startswith("catalog_"):
                 continue
-            graphs = []
-            for record_id in sorted(by_catalog[catalog]):
-                canonical = canonical_graph(parse_rdf(state.records[record_id].rdf))
-                graph = Graph()
-                for triple in canonical:
-                    graph.add(
-                        tuple(
-                            BNode(f"{record_id}_{term}")
-                            if isinstance(term, BNode)
-                            else term
-                            for term in triple
-                        )
-                    )
-                body = json.loads(
-                    graph.serialize(
-                        format="json-ld", context=CONTEXT, auto_compact=True
-                    )
-                )
-                body.pop("@context", None)
-                nodes = stable_jsonld(body.get("@graph", [body]))
-                graphs.append({"@id": f"urn:source:{record_id}", "@graph": nodes})
-            (directory / f"{name}.jsonld").write_text(
-                json_text({"@context": CONTEXT, "@graph": graphs}) + "\n",
-                encoding="utf-8",
+            owner, target = (
+                (right, left) if table == "series_datasets" else (left, right)
             )
+            before = len(dependencies[target])
+            dependencies[target].update(dependencies[owner])
+            changed |= len(dependencies[target]) != before
+    by_catalog = defaultdict(set)
+    for kind, identifier, record in provenance:
+        if kind == "catalogs":
+            by_catalog[identifier].add(record)
+        owner_catalogs = (
+            dependencies if record in state.referenced_records else memberships
+        )
+        for catalog in owner_catalogs.get(identifier, ()):
+            by_catalog[catalog].add(record)
+    return {catalog: by_catalog[catalog] for catalog in entities["catalogs"]}
+
+
+def write_jsonld(path, state, records):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    graphs = []
+    for record_id in sorted(records):
+        canonical = canonical_graph(parse_rdf(state.records[record_id].rdf))
+        graph = Graph()
+        for triple in canonical:
+            graph.add(
+                tuple(
+                    BNode(f"{record_id}_{term}") if isinstance(term, BNode) else term
+                    for term in triple
+                )
+            )
+        body = json.loads(
+            graph.serialize(format="json-ld", context=CONTEXT, auto_compact=True)
+        )
+        body.pop("@context", None)
+        nodes = stable_jsonld(body.get("@graph", [body]))
+        graphs.append({"@id": f"urn:source:{record_id}", "@graph": nodes})
+    path.write_text(
+        json_text({"@context": CONTEXT, "@graph": graphs}) + "\n",
+        encoding="utf-8",
+    )
 
 
 def stable_jsonld(value, *, ordered=False):

@@ -23,7 +23,14 @@ class ContextIndex:
         self.complete = False
 
     async def load(
-        self, client, batch, previous, *, force=False, changed_contexts=None
+        self,
+        client,
+        batch,
+        previous,
+        *,
+        force=False,
+        changed_contexts=None,
+        excluded_contexts=(),
     ):
         # Restore catalog identity when a metadata endpoint is temporarily unavailable.
         for record in previous.values():
@@ -31,6 +38,8 @@ class ContextIndex:
                 "catalog:"
             ):
                 context = record.native_id.split(":", 2)[1]
+                if context in excluded_contexts:
+                    continue
                 for entity in record.entities:
                     if entity["kind"] == "catalogs":
                         self.resource_ids[entity["uri"]].add(entity["id"])
@@ -82,7 +91,11 @@ class ContextIndex:
                 rows.extend(await client.solr(f"{query} AND ({selected})"))
             return rows
 
-        catalog_rows = await rows_for("Catalog")
+        catalog_rows = [
+            row
+            for row in await rows_for("Catalog")
+            if str(row["contextId"]) not in excluded_contexts
+        ]
         fresh_catalogs = defaultdict(list)
         failed_contexts = set()
 

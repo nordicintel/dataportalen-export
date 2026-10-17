@@ -248,3 +248,32 @@ Each phase consists of small vertical slices: write one failing behavioral test,
 - 2026-10-17: Completed acceptance. [Full live hosted harvest](https://github.com/nordicintel/dataportalen-export/actions/runs/39006216783) published both sources and every default format; consumer inspection verified all 1,347 products, equivalent database tables, foreign keys, all 19 Parquet tables, JSONL/JSON-LD parsing, complete national-root coverage, 110 datasets with multiple catalog memberships, and no failed/stale/skipped/unresolved datasets. Current counts: 659 catalogs, 25,124 datasets, 33 series, 36,882 distributions, 1,601 services, 11,079 publishers; 26,548 source records. XZ preserves the complete database schema/content while keeping SQLite at 61,854,284 bytes and DuckDB at 85,266,660 bytes, below GitHub's limit. The empty-catalog and differing Skatteverket URI references are documented without inventing memberships.
 - 2026-10-17: Corrected incremental processing after user review. Public Dataportal modification/count checks and EU ID/stamp reconciliation run before state loading. Changed contexts restrict membership queries and RDF processing; shared changed descriptions invalidate dependent records. Unchanged catalog files and Parquet tables keep their accepted bytes/checksums/validation. Confirmed removal preserves only descriptions still required by surviving references, including across reloads. A complete source outage is a visible workflow failure while validated independent updates may publish. [Final hosted incremental run](https://github.com/nordicintel/dataportalen-export/actions/runs/39011070214) completed the harvest in 2.68 seconds with 102,432 KiB peak RSS, zero record fetches and all 1,347 product checksums unchanged. [Hosted Checks](https://github.com/nordicintel/dataportalen-export/actions/runs/39011069895) passed Ruff and 30 tests. The next scheduled gate returned `due=false`; anonymous repository/manifest/database/Parquet/JSONL/JSON-LD access returned HTTP 200. `PLAN.md` is retained per the user's latest explicit instruction; its duplicate copy was removed.
 - 2026-10-17: Final consumer comparison streamed every row of all 19 published tables and verified identical row-value hashes and counts across SQLite, DuckDB and Parquet, including all 26,548 complete source records. This check compares the actual published products; it is separate from fixture tests. Generated diagnostic files inside local `.git` remain untracked because automatic approval review blocked their deletion; they are not part of the published repository.
+
+
+## ISSUE-002: Simplify current exports around the measured data
+
+State: open
+Status: ready-for-agent
+Assignee: Codex
+
+Use exactly six object tables, inline pointers/arrays, sparse projections across all
+object types and JSONL, no DuckDB export or file-checksum registries. Exclude EU
+`nsip-se` and redundant Hack4heritage context `104`; retain context `645` and all six
+unique datasets. Preserve source variants and correctly distinguish source bytes
+from derived RDF/JSON. Update SQLite rows and changed source groups incrementally.
+
+### Acceptance criteria
+
+Consumer queries show exactly six SQLite/Parquet tables, no unintended object or
+relationship loss, correct source exclusions, readable catalog filenames, and no
+DuckDB database product. Focused fixtures cover incremental row updates and source
+selection; hosted Checks and Harvest pass with usable published products.
+
+### Comments
+
+- 2026-10-17: Profiled all six published object types and dataset fields per catalog.
+  Confirmed empty inherited fields, sparse publisher/service attributes, and
+  unprojected landing pages. Local 31-test suite passed. A local full accepted-state
+  rebuild exceeded available memory during XZ preset 9 initialization; prior data
+  remained intact. Source writing now precedes SQL projection, preset 6 is the
+  configured default, and final product migration/verification will run on GitHub.

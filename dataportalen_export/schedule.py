@@ -50,6 +50,9 @@ def main():
     if output_file := os.environ.get("GITHUB_OUTPUT"):
         with open(output_file, "a", encoding="utf-8") as stream:
             stream.write(f"due={str(should_run).lower()}\n")
+            stream.write(
+                f"directory={output.resolve().relative_to(root.resolve()).as_posix()}\n"
+            )
 
 
 if __name__ == "__main__":

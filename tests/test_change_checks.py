@@ -166,3 +166,50 @@ def test_unchanged_harvest_does_not_open_state_or_products(tmp_path, monkeypatch
         (p.stat().st_mtime_ns, p.stat().st_size) == stats
         for p, stats in products.items()
     )
+
+    # A source/configuration exclusion must remove retained records as well as stop requests.
+    monkeypatch.undo()
+    from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
+    from dataportalen_export.exports.products import write_products
+
+    state = CurrentState.load(config.output.directory)
+    excluded = make_record(
+        Graph().parse(
+            data="<urn:excluded> a <http://www.w3.org/ns/dcat#Dataset> .",
+            format="turtle",
+        ),
+        source="dataeu",
+        native_id="excluded",
+        scope="dataeu:nsip-se",
+        root_uri="urn:excluded",
+        stamp="one",
+    )
+    state.records[excluded.id] = excluded
+    config.sources.dataeu = True
+    config.sources.exclude_eu_catalogs = ["oppnadata"]
+    national = {
+        key: record
+        for key, record in state.records.items()
+        if record.source == "dataportal"
+    }
+    write_products(
+        state,
+        config,
+        [
+            SourceBatch(
+                "dataportal",
+                http={"etag": '"same"'},
+                records=national,
+                seen=set(national),
+                complete_scopes={"dataportal"},
+                successful_scopes={"dataportal"},
+            )
+        ],
+        attempted_at="seed",
+        checkpoints=first["checkpoints"],
+    )
+    config.sources.exclude_eu_catalogs.append("nsip-se")
+    config.sources.dataeu = False
+    result = asyncio.run(Harvester(transport=transport).run(config))
+    assert result["entity_counts"]["datasets"] == 1
+    assert excluded.id not in CurrentState.load(config.output.directory).records

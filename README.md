@@ -1,54 +1,145 @@
 # Dataportal catalog exports
 
-Current Swedish catalog metadata in JSONL, SQLite, DuckDB, Parquet, and JSON-LD.
-The daily GitHub Actions harvest combines Dataportal's national RDF dump and
-underlying organization catalogs with other Swedish catalogs from data.europa.eu.
-The EU `oppnadata` aggregate is excluded because Dataportal supplies its records.
-Distribution URLs describe the underlying data; the harvester does not download
-those data files.
+Current Swedish catalog metadata, harvested daily by GitHub Actions. The application
+lives in this repository; it is not an installable Python package.
 
-## Current products
+## Products
 
-All current products live in [`data/`](data/). Read `data/manifest.json` for the
-actual filenames, sizes, checksums, counts, source outcomes, and freshness.
+Browse [catalog JSONL files](data/catalogs/) by name. The current
+[manifest](data/manifest.json) lists files, sizes, object counts, source failures,
+and freshness. `catalog_files` maps catalog identities to their downloads.
 
-| Product | Use |
-| --- | --- |
-| `datasets.jsonl` | One canonical dataset per line, including distributions, catalog IDs, and source-record IDs |
-| `catalogs.jsonl`, `dataset_series.jsonl`, `distributions.jsonl`, `data_services.jsonl`, `publishers.jsonl` | Separate object types |
-| `catalogs/<catalog-name>.jsonl` | Datasets belonging to one underlying catalog, e.g. `emmaboda-kommun.jsonl` |
-| `catalog.db` | SQLite with explicit tables and relationships |
-| `catalog.duckdb` | Equivalent DuckDB tables |
-| `parquet/<table>.parquet` | One Parquet file per logical table |
-| `jsonld/<catalog-name>.jsonld` | Embedded JSON-LD context and source-qualified named graphs |
-| `source_records.jsonl.xz` | Complete current source variants, RDF, and incremental state |
-| `raw/dataportal.rdf.gz` | Original national RDF dump, including material outside extracted entities |
+- `catalog.db` (or `.db.xz`): SQLite, with exactly six object tables.
+- `parquet/`: the same six tables and columns, one file per table.
+- `datasets.jsonl` (possibly `.xz`): datasets with catalog membership and distributions.
+- `catalogs.jsonl`, `dataset_series.jsonl`, `distributions.jsonl`,
+  `data_services.jsonl`, `publishers.jsonl`: individual object types.
+- `catalogs/<name>.jsonl`: one catalog's datasets.
+- `jsonld/<name>.jsonld`: JSON-LD derived from retained RDF graphs.
+- `source_records/<source>/<catalog>.jsonl.xz`: retained parsed source records,
+  source variants, graph descriptions, and fetch/modification timestamps.
+- `raw/dataportal.rdf.gz`: the national RDF dump, with its downloaded bytes preserved.
 
-Browse [`data/catalogs/`](data/catalogs/) by catalog name. Filenames use the Swedish
-title when available. Duplicate names include their source context ID (or a numeric
-suffix). Exact identities remain in the records; `manifest.json`'s `catalog_files`
-maps each catalog ID to its JSONL and JSON-LD downloads, including compression suffixes.
+There is no DuckDB database export. DuckDB is used internally to write/read Parquet.
+Catalog names are readable labels; original URIs and stable IDs determine identity.
+Duplicate labels use source context IDs or numeric suffixes.
 
-Files above the configured size threshold use XZ compression by default;
-`output.compression` can select `xz` or `gzip`, and `compression_level` selects
-0–9 (default 9). Decompress a `.db.xz` or
-`.duckdb.xz` before opening it. Python's standard-library `lzma` reads XZ files;
-`gzip` reads the optional `.gz` alternative. Compression changes no database
-tables, indexes, relationships, or metadata. The manifest names the actual files.
-If the combined datasets JSONL is still too large after compression, it is
-omitted explicitly and per-catalog files remain.
-Other required files exceeding GitHub's limit prevent publication.
+## Run
 
-```python
-import lzma
-import json
-
-with lzma.open("data/source_records.jsonl.xz", "rt", encoding="utf-8") as records:
-    first = json.loads(next(records))
-    print(first["source"], first["root_uri"], first["stale"])
+```sh
+uv sync --locked
+uv run python -m dataportalen_export
+uv run python -m dataportalen_export --validate
 ```
 
-To open a compressed database, first unpack it (use the same pattern for DuckDB):
+`--force` deliberately refetches unchanged records. `--config path/to/config.toml`
+selects another configuration. All operational settings are in root `config.toml`:
+formats, sources, exclusions, logging, HTTP concurrency/retries/timeouts, output
+directory, compression, Parquet memory limit, and daily timing. Paths resolve
+relative to the configuration. GitHub publication uses the configured directory.
+
+The two sources are Dataportal's [documented public catalog API](https://docs.dataportal.se/registry/api/)
+and Swedish catalogs in data.europa.eu. Defaults exclude:
+
+- EU `oppnadata`, the aggregate already covered by Dataportal.
+- EU `nsip-se` (National Single Information Point Sweden).
+- Dataportal context `104`, the four-dataset Hack4heritage registration. Context
+  `645` is kept; it contains those four datasets and two more.
+
+Exclusions remove previously accepted records and memberships as well as stopping
+retrieval. A transient source failure instead retains its last good data as stale.
+
+## SQLite schema
+
+Exactly six tables: `catalogs`, `datasets`, `dataset_series`, `distributions`,
+`data_services`, and `publishers`. Each exposes `id`, original `uri`, a readable
+`title`, multilingual `title_json`, `full_json`, `source_record_ids_json`, and
+`variants_json`. Unknown or uncommon metadata remains accessible in JSON.
+There are no junction, provenance, status, or source-record tables.
+
+| Table | Main queryable fields and pointers |
+| --- | --- |
+| `catalogs` | Context IDs, description, homepage, dates, publisher |
+| `datasets` | Catalog, publisher, series, description, dates, identifiers, keywords, themes, access rights, landing pages, languages, update frequency |
+| `dataset_series` | Catalog, publisher, description, identifiers, dates |
+| `distributions` | Parent dataset, service, access/download URLs, format, media type, license, byte size, description, dates |
+| `data_services` | Catalog, publisher, served dataset IDs, endpoints, service type/protocol |
+| `publishers` | Name, original agent/organization types, homepage |
+
+Scalar pointers such as `datasets.publisher_id`, `datasets.catalog_id`,
+`datasets.series_id`, and `distributions.dataset_id` have foreign keys and indexes.
+A scalar pointer is null if the relationship is absent or has multiple targets;
+multiple targets are retained in `full_json` as `<relationship>_ids`.
+Services' `dataset_ids_json` retains their many-to-many served-dataset relationships.
+No first target is silently selected.
+
+Distributions have one row per dataset/distribution pair. `id` retains the canonical
+object identity; `row_id` is the row's primary key. A shared distribution therefore
+appears once per parent, preserving its original URI and metadata. An unassigned
+distribution has a null `dataset_id`. Object counts in the manifest count distinct
+objects; table counts include these parent rows.
+
+```sql
+SELECT d.title, c.title AS catalog, p.title AS publisher
+FROM datasets d
+LEFT JOIN catalogs c ON c.id = d.catalog_id
+LEFT JOIN publishers p ON p.id = d.publisher_id;
+
+SELECT d.title, r.access_urls_json, r.download_urls_json, r.formats_json
+FROM datasets d
+JOIN distributions r ON r.dataset_id = d.id;
+```
+
+Dedicated columns follow observed field usage. For example, dataset homepages and
+catalog identifiers were entirely empty; publisher dates appeared once each.
+These do not receive redundant dedicated columns. Populated rare values remain
+in `full_json` and source variants. Sparse JSONL omits empty/null fields, redundant
+object `kind`, and an implied standard RDF type. Additional RDF types remain.
+Explicit projected fields avoid repeating their predicate values in `extra_properties`;
+that map contains unprojected predicates under full IRIs. This is a custom normalized
+JSON representation, not the original source format.
+
+`variants_json` retains parsed per-source object variants and their source-record IDs.
+Complete source-record metadata and RDF graphs are in the source exports. Per-record
+Turtle and JSON-LD are derived serializations; only the national dump is preserved
+as downloaded bytes. Source licenses, attribution, language tags, and unparsed
+optional values remain in the retained metadata.
+
+## Refresh and publication
+
+Small public modification/count checks run before loading source records. An
+unchanged run updates only the manifest and attempt stamp; it does not load state,
+construct exports, hash files, or revalidate accepted products.
+
+Changed contexts scope membership queries and RDF processing. EU records use
+catalog-record modification timestamps before fetching descriptions. Shared changed
+descriptions invalidate their dependents. A changed national dump is downloaded
+and parsed once; its original bytes remain available separately.
+
+Source state is split by source/catalog so only changed groups are serialized and
+compressed. SQLite applies row deletions/upserts to a copy of the accepted database;
+it does not recreate all tables for a record change. Changed Parquet tables and
+JSONL/JSON-LD products are regenerated; unchanged products retain their accepted
+bytes. A changed combined JSONL or compressed SQLite file still requires rewriting
+that whole file. There are no file-checksum or product-hash registries.
+
+All products are prepared in a temporary directory, checked, and accepted together.
+SQLite foreign keys/integrity and row counts, all Parquet files, JSONL, JSON-LD,
+and file sizes are validated for changed products. `--validate` checks all files.
+An export failure preserves the previous products; publication never force-pushes.
+
+Expected isolated record failures produce warnings and retain existing records with
+their old fetch timestamps. Incomplete listings do not authorize deletion. An entire
+source outage is a visible failure; validated independent updates may still publish.
+After correcting an error, manually dispatch Harvest; do not delete retained state.
+
+GitHub Actions checks the daily gate hourly and harvests after 06:00 Europe/Stockholm
+by default. When not due, it installs no harvest dependencies and makes no API calls.
+One concurrency group prevents overlapping harvests. The attempt day is separate
+from successful source refreshes, preventing hourly retries after partial failures.
+
+Compression is XZ preset 6 by default, with optional gzip. The level is configurable; preset 6 uses less encoder memory than preset 9. Open a compressed database after
+unpacking it:
 
 ```python
 import lzma
@@ -61,196 +152,10 @@ with (
     shutil.copyfileobj(source, target)
 ```
 
-## Run and configure
+Required files must fit GitHub's limit. Only an oversized combined datasets JSONL
+may be omitted explicitly; per-catalog files remain available.
 
-The application lives in this repository and is not installed as a Python
-distribution. Dependencies and their resolved versions are managed by uv.
-
-```sh
-uv sync --locked
-uv run python -m dataportalen_export
-uv run python -m dataportalen_export --force
-uv run python -m dataportalen_export --validate
-```
-
-Operational settings live in [`config.toml`](config.toml): active formats,
-source selection, concurrency, timeouts, retry attempts, logging levels,
-output path, DuckDB memory limit, compression method/level/threshold, and daily
-time/timezone. Paths resolve relative to the configuration file, independently
-of the current working directory.
-`--config` selects another TOML file for a deliberate separate run.
-
-Unattended execution uses **GitHub-hosted Actions only**. The Harvest workflow
-wakes hourly at minute 17. A standard-library-only check reads TOML and runs
-the daily harvest after 06:00 Europe/Stockholm by default. GitHub can delay
-scheduled starts. The check skips dependency installation and network requests
-when no harvest is due. Manual workflow dispatch bypasses the time gate and
-can request a forced refresh.
-
-`.github/last_attempt.json` records the latest attempted day, including failures;
-it prevents repeated full harvests every hour. It is separate from the data
-manifest, which describes the last published product set. Only current filenames
-are maintained; ordinary Git history still contains earlier commits.
-
-## Data and identity
-
-Six entity types are modeled: catalogs, datasets, dataset series, distributions,
-data services, and publishers. Publisher RDF types remain intact: an agent is
-not automatically asserted to be an organization.
-
-IDs are stable SHA-256 digests of typed identities. Original URIs and native
-source identifiers remain in the products. Dataset identity uses exact original
-URIs when available. Catalog IDs include their source/context identity, never a
-display title. Multiple catalog memberships are preserved. Titles, shared URLs,
-and UUIDs alone do not merge datasets. Exact matches prefer Dataportal for the
-default representation, while all complete source variants remain available.
-
-Text fields are language-to-list mappings, including `und` for untagged text.
-Arrays remain arrays for one or many values. All original language tags survive.
-`extra_properties` retains RDF properties by full predicate IRI; literal objects
-retain their text, datatype, and language, and resource objects retain references.
-The original RDF preserves graph detail, including supporting blank nodes.
-Dates accept ISO years (`2022`), year-months (`2006-09`), full dates, and timestamps.
-Reduced precision stays intact; timestamps use `T` and explicit supplied offsets.
-Swedish written dates such as `10 juni 2020` normalize to `2020-06-10`.
-Byte counts accept space-grouped digits such as `155 648`, including nonbreaking spaces.
-Unparseable optional dates or numbers have null typed projections while their
-source values remain available. Source licenses and attribution are preserved;
-the code's MIT license does not replace the licenses of harvested metadata.
-
-## Database schema
-
-The six entity tables are `catalogs`, `datasets`, `dataset_series`,
-`distributions`, `data_services`, and `publishers`. Each has:
-
-| Column | Meaning |
-| --- | --- |
-| `id` | Non-null primary key |
-| `uri` | Original/canonical URI; null for a blank-node entity |
-| `title_json`, `description_json` | Non-null language maps |
-| `issued`, `modified` | Nullable ISO year, year-month, date, or date-time projections |
-| `types_json`, `identifiers_json`, `homepages_json` | Non-null JSON arrays |
-| `full_json` | Complete convenient entity representation and RDF properties |
-
-Additional columns are `context_ids_json` on catalogs;
-`keywords_json`, `themes_json`, `access_rights_json` on datasets;
-`access_urls_json`, `download_urls_json`, `media_types_json`, `formats_json`,
-`licenses_json`, and nullable numeric `byte_size` on distributions;
-and `endpoint_urls_json`, `endpoint_descriptions_json` on services.
-
-Relationship tables use non-null `left_id` and `right_id`, a composite primary
-key, and foreign keys to the named entities:
-
-| Table | Left → right |
-| --- | --- |
-| `catalog_datasets` | catalog → dataset |
-| `catalog_series` | catalog → series |
-| `catalog_services` | catalog → service |
-| `series_datasets` | series → dataset |
-| `dataset_distributions` | dataset → distribution |
-| `distribution_services` | distribution → service |
-| `service_datasets` | service → dataset |
-| `catalog_publishers`, `dataset_publishers`, `series_publishers` | named entity → publisher |
-
-`source_records` stores `id`, `source`, `native_id`, `scope`, `root_uri`,
-`stamp`, `digest`, `fetched_at`, `stale`, `rdf`, and `full_json` (all non-null).
-Its JSON contains the source-specific entities and links; RDF is stored in its
-own column. `entity_sources(kind, entity_id, source_record_id)` links every
-entity to its variants. Polymorphic entity references are checked before export.
-
-`harvest_status` contains one row per scope: `scope`, `source`, `record_count`,
-`stale_count`, and `last_successful_fetch`. This timestamp describes retained
-content; the manifest records the latest source check/attempt separately.
-
-```sql
--- Datasets and every underlying catalog membership.
-SELECT d.uri, d.title_json, c.title_json AS catalog_title
-FROM datasets d
-JOIN catalog_datasets cd ON cd.right_id = d.id
-JOIN catalogs c ON c.id = cd.left_id;
-
--- Source freshness for each dataset variant.
-SELECT d.uri, s.source, s.fetched_at, s.stale
-FROM datasets d
-JOIN entity_sources es ON es.entity_id = d.id AND es.kind = 'datasets'
-JOIN source_records s ON s.id = es.source_record_id;
-```
-
-## Failure handling and recovery
-
-Transient HTTP failures receive bounded retries. A failed existing record keeps
-its last good version and successful-fetch timestamp; a new unusable record is
-reported and skipped. Incomplete listings suppress deletion in their scope.
-Confirmed disappearance removes only the affected source membership/variant.
-Last-known descriptions still needed by surviving records remain stale with their
-original source RDF and fetch time. The manifest's `referenced_records` identifies
-those descriptions; they do not re-enter discovery. Unneeded descriptions are removed.
-One unavailable source does not block successful independent sources.
-
-Expected isolated failures appear as warnings and stale/skipped counts. Broken
-configuration, a completely unavailable source, unusable first-run data,
-integrity errors, oversized required exports, or a failed push are visible
-workflow failures. When one source is unavailable, validated products from the other
-source can still publish alongside retained stale records, with `source_failure`
-in the manifest and a failed workflow result. If all sources fail, products stay
-unchanged. Candidate files are checked before replacing current outputs.
-The complete accepted set is published in one commit, never with a force-push.
-
-Inspect the Actions summary and manifest on failure. Correct configuration or
-source compatibility issues, then dispatch Harvest manually. Use `force` when
-intentionally rebuilding retained source projections after a schema change.
-Do not delete retained state to resolve a transient failure.
-
-Dataportal's [documented public catalog API](https://docs.dataportal.se/registry/api/)
-and data.europa.eu are the two metadata sources. EntryStore/EntryScape is the
-software behind Dataportal's public API.
-
-Before opening saved source records, the command checks the national dump's HTTP
-validators, Dataportal counts grouped by context (including related descriptions) and entries modified since the
-previous check, and compact EU ID/modification listings reconciled with repository
-IDs. A five-minute inclusive overlap tolerates indexing delays and equal timestamps.
-Counts detect additions, removals and disappeared contexts. Missing or incomplete
-signals fall back to retrieval. Checkpoints live in the current manifest.
-
-If those checks show no changes, the command updates only the manifest's check
-time and run counters. It skips loading/decompressing source state, constructing
-a candidate directory, serializing/compressing exports, and reopening previously
-validated products. It checks that published files still exist with their recorded
-sizes. Use `--validate` for a deliberate full checksum and consumer-read check.
-
-When a context changes, membership queries target that context. Other national
-contexts and unchanged EU catalogs retain their accepted records. Catalog metadata
-uses its entry modification timestamp, EU catalogs use their modification timestamp,
-and EU datasets use their catalog-record modification timestamp. `--force` bypasses
-reuse. The first run after adding checkpoints needs one complete baseline listing;
-subsequent checks use the compact grouped queries.
-
-A changed national dump is retained in full and parsed once. RDF extraction and
-comparison then target affected catalog roots, new or unresolved roots, and records
-that may reference changed shared descriptions. Independent catalog records reuse
-their accepted RDF and projections. Ambiguous dependency signals trigger a
-conservative comparison.
-
-Unchanged catalog JSONL and JSON-LD files are reused using content fingerprints.
-Only affected catalog files are regenerated; changes to shared metadata also
-invalidate the catalogs that use it. The combined files are checked separately.
-Unchanged Parquet tables are reused individually. Retained products keep their
-previous checksums and validation results; only new or changed files are validated
-during publication. The compressed source archive and shared SQLite and DuckDB
-products are reused when their accepted state is unchanged; changed shared
-databases are rebuilt and compressed as whole files.
-
-If export generation fails in Actions, the `failed-harvest-state` artifact retains
-the source state, original dump, and compressed database candidates for one day.
-These diagnostics are not published under `data/`; they let an export fix reuse
-already retrieved metadata. Download the artifact from the failed run before it
-expires. Size-limit errors include the exact compressed byte count.
-Before the first publication, a manual dispatch can set `recovery_run_id` to that
-failed run. It restores only retained source state into an empty output directory,
-then checks both live sources and builds all products normally. Existing published
-products cannot be overwritten by this recovery input.
-
-## Development checks
+## Development
 
 ```sh
 uv run pytest -q
@@ -258,46 +163,7 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Tests use a small RDF fixture, external HTTP fixtures, and actual exported files.
-They are separate from full live verification in GitHub Actions. Add a failing
-behavioral test before a meaningful change, then implement only that behavior.
-
-## Verified publication — 2026-10-17
-
-The [full hosted harvest](https://github.com/nordicintel/dataportalen-export/actions/runs/39006216783)
-published both live sources with every default format enabled. The current products contain:
-
-| Entity | Count |
-| --- | ---: |
-| Catalogs | 659 |
-| Datasets | 25,124 |
-| Dataset series | 33 |
-| Distributions | 36,882 |
-| Data services | 1,601 |
-| Publishers | 11,079 |
-
-There are 26,548 retained source records and 1,347 product files, including 19
-Parquet tables and 659 catalog files in each of JSONL and JSON-LD. Consumer
-verification opened both databases, checked foreign keys and cross-format table
-contents, read every Parquet file, parsed JSONL/JSON-LD, and confirmed coverage of
-every national dataset, series and service root. There are no failed, stale or
-skipped records, no datasets without catalog membership, and no omitted products
-in this publication. SQLite is 61,854,284 bytes compressed; DuckDB is 85,266,660
-bytes. Database tables, full JSON, original RDF, relationships and indexes remain
-intact.
-
-The [final incremental hosted run](https://github.com/nordicintel/dataportalen-export/actions/runs/39011070214)
-took 2.68 seconds for the harvest command, with 102,432 KiB peak resident memory.
-It fetched zero records and kept every product checksum unchanged. GitHub checkout
-and runner setup take additional time. The initial full harvest took 19m39s and
-5,316,700 KiB peak resident memory. The [code checks](https://github.com/nordicintel/dataportalen-export/actions/runs/39011069895)
-passed Ruff and 30 deterministic tests. Scoped changes, shared descriptions,
-failure isolation and confirmed removals are tested with external HTTP fixtures;
-the full harvest and repeat-run measurements use the live services.
-
-Some catalog resources have no dataset members in the source metadata. One
-Skatteverket partner catalog has 27 references using `%23dataset` while the
-available dataset URIs use `%2523dataset`. The counterpart datasets are present;
-the differing original URIs stay distinct, and the catalog's references remain
-in its metadata. Source date/size values that cannot be projected remain intact
-with null typed projections.
+Tests use external HTTP fixtures and actual exported files. They verify source
+selection, failure isolation, identities, RDF topology, sparse projections, six-table
+SQLite/Parquet consistency, shared distribution parents, incremental SQLite updates,
+and reuse of unrelated products. Hosted runs verify actual source integrations.

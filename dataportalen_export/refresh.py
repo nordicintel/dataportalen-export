@@ -1,7 +1,6 @@
 """Select source work using public catalog modification signals, before state loading."""
 
 import asyncio
-import hashlib
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -10,23 +9,16 @@ import httpx
 
 from dataportalen_export.current_state import SCHEMA_VERSION, now_iso
 from dataportalen_export.portal_client import DUMP
-from dataportalen_export.schema import json_text
 
 log = logging.getLogger(__name__)
 
 
-def fingerprint(value):
-    return hashlib.sha256(json_text(value).encode()).hexdigest()
-
-
-def configuration_signature(config):
-    return fingerprint(
-        {
-            "schema": SCHEMA_VERSION,
-            "sources": config.sources.model_dump(),
-            "output": config.output.model_dump(mode="json", exclude={"directory"}),
-        }
-    )
+def configuration(config):
+    return {
+        "schema": SCHEMA_VERSION,
+        "sources": config.sources.model_dump(),
+        "output": config.output.model_dump(mode="json", exclude={"directory"}),
+    }
 
 
 @dataclass
@@ -53,6 +45,16 @@ async def check_sources(client, config, previous):
                 client.context_counts(),
                 client.context_counts(descriptions=True),
             )
+            counts = {
+                key: value
+                for key, value in counts.items()
+                if key not in config.sources.exclude_dataportal_contexts
+            }
+            description_counts = {
+                key: value
+                for key, value in description_counts.items()
+                if key not in config.sources.exclude_dataportal_contexts
+            }
             validators = {
                 k: headers.headers[k]
                 for k in ("etag", "last-modified", "content-length")
@@ -67,6 +69,19 @@ async def check_sources(client, config, previous):
                     .replace("+00:00", "Z")
                 )
                 modified = await client.context_counts(since=since, descriptions=True)
+                modified = {
+                    key: value
+                    for key, value in modified.items()
+                    if key not in config.sources.exclude_dataportal_contexts
+                }
+                prior = {
+                    **prior,
+                    "counts": {
+                        key: value
+                        for key, value in prior["counts"].items()
+                        if key not in config.sources.exclude_dataportal_contexts
+                    },
+                }
                 relevant = counts.keys() | prior["counts"].keys()
                 dirty = set(modified) | {
                     context
@@ -74,6 +89,12 @@ async def check_sources(client, config, previous):
                     if counts.get(context) != prior["counts"].get(context)
                 }
                 previous_descriptions = prior.get("description_counts")
+                if previous_descriptions is not None:
+                    previous_descriptions = {
+                        key: value
+                        for key, value in previous_descriptions.items()
+                        if key not in config.sources.exclude_dataportal_contexts
+                    }
                 if previous_descriptions is not None:
                     dirty.update(
                         context
@@ -137,7 +158,7 @@ async def check_sources(client, config, previous):
                 try:
                     refs = await client.eu_listing(catalog)
                     check.eu_listings[catalog] = refs
-                    current = {"modified": stamp, "listing": fingerprint(refs)}
+                    current = {"modified": stamp, "listing": refs}
                     checkpoints[catalog] = current
                     if (
                         stamp

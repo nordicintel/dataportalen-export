@@ -1,10 +1,10 @@
 # Implementation plan: daily Dataportal catalog exports
 
-Build a minimal, repo-local Python application from the reviewed reference code. Harvest Dataportal’s underlying catalogs plus other Swedish catalogs in data.europa.eu, preserve source metadata, and publish the current exports into the repository’s `/data`.
+Build a minimal, repo-local Python application from the reviewed reference code. Harvest Dataportalâ€™s underlying catalogs plus other Swedish catalogs in data.europa.eu, preserve source metadata, and publish the current exports into the repositoryâ€™s `/data`.
 
 Work sequentially without subagents. Write a small failing behavioral test before implementing each meaningful capability. Finish with a full GitHub-hosted harvest, verify its actual outputs, and make the repository public only after acceptance passes.
 
-## Part 1 — Establish the application and configuration
+## Part 1 â€” Establish the application and configuration
 
 **Tests first**
 
@@ -38,7 +38,7 @@ Configuration errors fail before network access. Resolve paths relative to the r
 
 **Complete when:** the command loads validated configuration and processes the fixture without installing the repository as a package.
 
-## Part 2 — Implement reliable source retrieval
+## Part 2 â€” Implement reliable source retrieval
 
 **Tests first**
 
@@ -50,14 +50,14 @@ Mock external HTTP responses, not our own classes.
 
 Preserve the useful capabilities already present in the reference:
 
-- Download and parse Dataportal’s national RDF dump.
+- Download and parse Dataportalâ€™s national RDF dump.
 - Resolve underlying catalogs and memberships through EntryScape.
 - Discover other Swedish EU catalogs.
 - Reconcile EU search results with repository listings.
 - Fetch referenced distribution descriptions missing from dataset RDF.
 - Bound concurrent requests and retry transient failures.
 
-Correct the reference’s assumptions:
+Correct the referenceâ€™s assumptions:
 
 - Catalog titles are labels, never identifiers.
 - One dataset can belong to multiple catalogs.
@@ -70,7 +70,7 @@ Each source produces source records plus explicit discovery-completeness informa
 
 **Complete when:** both integrations produce the same internal record contract, and a failed request or incomplete listing remains isolated.
 
-## Part 3 — Define models, identity, and incremental refresh
+## Part 3 â€” Define models, identity, and incremental refresh
 
 **Tests first**
 
@@ -133,7 +133,7 @@ Do not assign fresh timestamps to stale content. Keep failures and source timest
 
 **Complete when:** repeated runs converge, changed records refresh, and one bad record cannot cause cascading loss.
 
-## Part 4 — Implement the database and export products
+## Part 4 â€” Implement the database and export products
 
 **Tests first**
 
@@ -166,7 +166,7 @@ Produce:
 | ---------------------------------- | -------------------------------------------------------- |
 | `datasets.jsonl`                   | Combined canonical dataset records                       |
 | Object-type JSONL files            | Catalogs, series, distributions, services, publishers    |
-| Per-catalog JSONL                  | Each catalog’s member datasets                           |
+| Per-catalog JSONL                  | Each catalogâ€™s member datasets                           |
 | `catalog.db`                       | SQLite database                                          |
 | `catalog.duckdb`                   | DuckDB database                                          |
 | Parquet directory                  | One file per logical table                               |
@@ -181,11 +181,11 @@ Keep exports deterministic. Do not rewrite unchanged record timestamps; retain u
 
 Build all products in a temporary working directory and validate them before publication. Commit the accepted set together.
 
-Use gzip when necessary. If the largest combined JSONL still exceeds GitHub’s limit after compression, omit it and report that explicitly while keeping the split files. Other required oversized products block publication rather than silently disappearing.
+Use gzip when necessary. If the largest combined JSONL still exceeds GitHubâ€™s limit after compression, omit it and report that explicitly while keeping the split files. Other required oversized products block publication rather than silently disappearing.
 
-**Complete when:** every enabled format represents the same accepted state, opens successfully, and fits GitHub’s file limits.
+**Complete when:** every enabled format represents the same accepted state, opens successfully, and fits GitHubâ€™s file limits.
 
-## Part 5 — Add unattended GitHub Actions
+## Part 5 â€” Add unattended GitHub Actions
 
 **Tests first**
 
@@ -221,7 +221,7 @@ Never force-push over newer repository work. A conflicting publication must pres
 
 **Complete when:** GitHub-hosted execution publishes actual exports safely and subsequent due checks skip correctly.
 
-## Part 6 — Verify the complete harvest and publish the repository
+## Part 6 â€” Verify the complete harvest and publish the repository
 
 Run the full deterministic suite and Ruff once the implementation is complete. Repeat checks only when changes or failures justify it.
 
@@ -238,6 +238,19 @@ The second run verifies incremental behavior; it is not another round of specula
 
 Document the command, configuration, schema, example SQL, download/decompression behavior, freshness indicators, and recovery procedure. Preserve source licenses and attribution in the metadata.
 
-Acceptance requires a working full hosted harvest and usable published products—not merely passing fixture tests. Benign source irregularities may remain documented warnings; unexplained data loss, broken exports, and implementation errors must be resolved before public launch.
+Acceptance requires a working full hosted harvest and usable published productsâ€”not merely passing fixture tests. Benign source irregularities may remain documented warnings; unexplained data loss, broken exports, and implementation errors must be resolved before public launch.
 
 The resulting repository contains only current export filenames, with ordinary Git history. It has no local scheduler, historical export folders, installable package, or separate metrics harvester.
+
+
+## User revisions — 2026-10-17
+
+The latest instructions supersede the original schema/output details above:
+exactly six object tables, inline relationships/provenance, no DuckDB database export,
+exclude EU `nsip-se`, and exclude redundant Hack4heritage context `104` while retaining
+context `645`. Tailor dedicated columns to measured field usage across all six object
+types; sparse JSONL and SQLite/Parquet share cleaned projections. Keep uncommon source
+metadata, complete source variants, and RDF graph exports. Original bytes and derived
+serializations must be described accurately. Remove file-checksum/hash registries,
+update SQLite rows incrementally, and split retained state so only changed catalog
+groups are serialized/compressed. Preserve unchanged published files and verify Actions.

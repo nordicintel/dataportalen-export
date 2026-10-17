@@ -5,9 +5,10 @@ timezone = "Europe/Stockholm"
 
 [sources]
 dataportal = true
+exclude_dataportal_contexts = ["104"]
 dataeu = true
 countries = ["se"]
-exclude_eu_catalogs = ["oppnadata"]
+exclude_eu_catalogs = ["oppnadata", "nsip-se"]
 
 [harvest]
 concurrency = 8
@@ -25,10 +26,9 @@ combined_jsonl = true
 entity_jsonl = true
 catalog_jsonl = true
 sqlite = true
-duckdb = true
 duckdb_memory_limit_mb = 512
 parquet = true
 jsonld = true
 compression = "xz"
-compression_level = 9
+compression_level = 6
 compression_threshold_mib = 95

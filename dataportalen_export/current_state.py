@@ -16,12 +16,10 @@ from dataportalen_export.rdf_converter import (
     LINKS,
     MODELS,
     RdfConverter,
-    byte_size_projection,
-    date_projection,
 )
 from dataportalen_export.rdf_graph import graph_digest
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def now_iso():
@@ -96,54 +94,36 @@ class CurrentState:
 
     @classmethod
     def load(cls, directory: Path):
-        path = next(
-            (
+        paths = sorted(
+            path
+            for path in (directory / "source_records").rglob("*.jsonl.*")
+            if path.suffix in {".xz", ".gz"}
+        )
+        if not paths:
+            paths = [
                 directory / name
                 for name in ("source_records.jsonl.xz", "source_records.jsonl.gz")
                 if (directory / name).exists()
-            ),
-            None,
-        )
-        if path is None:
-            return cls()
-        opener = lzma.open if path.suffix == ".xz" else gzip.open
-        with opener(path, "rt", encoding="utf-8") as stream:
-            records = [
-                SourceRecord.model_validate_json(line)
-                for line in stream
-                if line.strip()
-            ]
-        # Repair typed projections from retained lexical values without refetching
-        # unchanged RDF or assigning a new successful-fetch timestamp.
-        for record in records:
-            for entity in record.entities:
-                for name in ("issued", "modified"):
-                    values = entity["extra_properties"].get(
-                        f"http://purl.org/dc/terms/{name}", []
-                    )
-                    entity[name] = date_projection(
-                        sorted(
-                            {item.get("value", item.get("id", "")) for item in values}
-                        ),
-                        entity.get("uri") or entity["id"],
-                    )
-                if entity["kind"] == "distributions":
-                    sizes = entity["extra_properties"].get(
-                        "http://www.w3.org/ns/dcat#byteSize", []
-                    )
-                    entity["byte_size"] = byte_size_projection(
-                        sorted(
-                            {item.get("value", item.get("id", "")) for item in sizes}
-                        ),
-                        entity.get("uri") or entity["id"],
-                    )
+            ][:1]
+        records = {}
+        for path in paths:
+            opener = lzma.open if path.suffix == ".xz" else gzip.open
+            with opener(path, "rt", encoding="utf-8") as stream:
+                for line in stream:
+                    if line.strip():
+                        record = SourceRecord.model_validate_json(line)
+                        if record.id in records:
+                            raise ValueError(
+                                f"Duplicate retained source record {record.id}"
+                            )
+                        records[record.id] = record
         manifest = directory / "manifest.json"
         referenced = (
             json.loads(manifest.read_text()).get("referenced_records", {})
             if manifest.exists()
             else {}
         )
-        return cls({r.id: r for r in records}, referenced)
+        return cls(records, referenced)
 
     def apply(self, batch: SourceBatch):
         candidates = {key: self.records.pop(key) for key in self.referenced_records}
