@@ -1,0 +1,31 @@
+[schedule]
+enabled = true
+time = "06:00"
+timezone = "Europe/Stockholm"
+
+[sources]
+dataportal = true
+dataeu = true
+countries = ["se"]
+exclude_eu_catalogs = ["oppnadata"]
+
+[harvest]
+concurrency = 8
+request_timeout_seconds = 60
+download_timeout_seconds = 600
+max_attempts = 5
+
+[logging]
+level = "INFO"
+http_level = "WARNING"
+
+[output]
+directory = "data"
+combined_jsonl = true
+entity_jsonl = true
+catalog_jsonl = true
+sqlite = true
+duckdb = true
+parquet = true
+jsonld = true
+gzip_threshold_mib = 95

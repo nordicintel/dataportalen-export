@@ -1,0 +1,23 @@
+name: Checks
+on:
+  push:
+    paths-ignore: ['data/**', '.github/last_attempt.json', '**.md']
+  pull_request:
+    paths-ignore: ['data/**', '.github/last_attempt.json', '**.md']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.13'
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest -q

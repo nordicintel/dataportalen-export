@@ -1,0 +1,72 @@
+name: Harvest
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Refetch unchanged records
+        type: boolean
+        default: false
+permissions:
+  contents: write
+concurrency:
+  group: catalog-harvest
+  cancel-in-progress: false
+jobs:
+  harvest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check daily schedule
+        id: schedule
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            python -m dataportalen_export.schedule --manual
+          else
+            python -m dataportalen_export.schedule
+          fi
+      - uses: astral-sh/setup-uv@v6
+        if: steps.schedule.outputs.due == 'true'
+        with:
+          python-version: '3.13'
+          enable-cache: true
+      - if: steps.schedule.outputs.due == 'true'
+        run: uv sync --locked --no-dev
+      - name: Harvest and validate products
+        id: harvest
+        if: steps.schedule.outputs.due == 'true'
+        env:
+          FORCE_REFRESH: ${{ inputs.force }}
+        run: |
+          if [ "$FORCE_REFRESH" = "true" ]; then
+            uv run --no-dev python -m dataportalen_export --force
+          else
+            uv run --no-dev python -m dataportalen_export
+          fi
+      - name: Record attempt and publish
+        if: always() && steps.schedule.outputs.due == 'true'
+        env:
+          HARVEST_OUTCOME: ${{ steps.harvest.outcome }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, UTC
+          from pathlib import Path
+          Path('.github/last_attempt.json').write_text(json.dumps({
+              'attempted_at': datetime.now(UTC).isoformat(),
+              'outcome': os.environ['HARVEST_OUTCOME'],
+          }, separators=(',', ':')) + '\n')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/last_attempt.json
+          if [ "$HARVEST_OUTCOME" = 'success' ]; then
+            git add data/
+          fi
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Refresh current catalog exports'
+          git push origin HEAD:main
