@@ -1,34 +1,21 @@
+[scrape]
+catalogs = ["oppnadata"]
+countries = [] # Country IDs, e.g. ["se"]. Combined with catalogs as a union.
+languages = ["sv", "en"] # Empty means keep all languages.
+page_size = 500
+max_attempts = 5
+timeout_seconds = 120
+retry_backoff_seconds = 1
+page_delay_seconds = 0
+gzip_level = 6
+log_level = "INFO"
+
 [schedule]
 enabled = true
+interval_days = 1
 time = "06:00"
 timezone = "Europe/Stockholm"
 
-[sources]
-dataportal = true
-exclude_dataportal_contexts = ["104"]
-dataeu = true
-countries = ["se"]
-exclude_eu_catalogs = ["oppnadata", "nsip-se"]
-
-[harvest]
-concurrency = 8
-request_timeout_seconds = 60
-download_timeout_seconds = 600
-max_attempts = 5
-
-[logging]
-level = "INFO"
-http_level = "WARNING"
-
-[output]
-directory = "data"
-combined_jsonl = true
-entity_jsonl = true
-catalog_jsonl = true
-sqlite = true
-duckdb_memory_limit_mb = 512
-parquet = true
-jsonld = true
-compression = "xz"
-compression_level = 6
-compression_threshold_mib = 95
+[database]
+enabled = false
+zstd_level = 6

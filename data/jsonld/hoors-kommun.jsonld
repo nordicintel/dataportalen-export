@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/409/resource/2","@type":"dcat:Catalog","dct:title":"Höörs kommun"}],"@id":"urn:source:46a52436215a8c1a9a8d988c627e196459ca1c17aca4bc522f7ed3ceaaec7cd6"}]}

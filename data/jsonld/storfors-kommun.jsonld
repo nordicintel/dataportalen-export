@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/63/resource/2","@type":"dcat:Catalog","dct:title":"Storfors kommun"}],"@id":"urn:source:9ee6029e3df447299cea75d329537b5e85d54ef0ea1bf0e5568c214fcb857f37"}]}

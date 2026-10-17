@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/608/resource/2","@type":"dcat:Catalog","dct:title":"Bräcke kommun"}],"@id":"urn:source:cff994455cd44094145d5ee9628355de8321d864a150ca45c095bbb5c30ea6c1"}]}

@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/466/resource/2","@type":"dcat:Catalog","dct:title":"Sametinget"}],"@id":"urn:source:707d7b369996abd90138973245906ef3d257a618db9ad4721117d9325c7cb34b"}]}

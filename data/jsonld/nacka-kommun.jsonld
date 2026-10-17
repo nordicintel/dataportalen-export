@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/498/resource/2","@type":"dcat:Catalog","dct:title":"Nacka kommun"}],"@id":"urn:source:5f8b85d6c0d6798fb86ab1a66dab3c063663bc82d6c7a8c8cd050df8234fcf1a"}]}

@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/11/resource/2","@type":"dcat:Catalog","dct:title":"Ystads tingsrätt"}],"@id":"urn:source:f91698397ccab25654b60f9f82fe34f5ad960e07a3a6e1d0f506b333c01d919e"}]}

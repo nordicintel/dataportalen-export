@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/482/resource/2","@type":"dcat:Catalog","dct:title":"Västerås stad"}],"@id":"urn:source:dbe2fb89cf826a268a5297dace5979652af0c981f78f15a888f8ef8e3d20c0c9"}]}

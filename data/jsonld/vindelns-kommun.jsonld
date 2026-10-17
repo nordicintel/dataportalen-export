@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/15/resource/2","@type":"dcat:Catalog","dct:title":"Vindelns kommun"}],"@id":"urn:source:dda7f21c81b31d0fc0de142222ca347c0beed6749acca7ef301dbd2316e9580b"}]}

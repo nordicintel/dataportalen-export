@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/602/resource/2","@type":"dcat:Catalog","dct:title":"Notarienämnden"}],"@id":"urn:source:432648c42d8cef438dfb7e8663ca2107950451aad13297989c2cf33f4d44fa62"}]}
