@@ -283,7 +283,11 @@ def tables_for(state, entities, links, provenance):
                 )
                 variant = variants.setdefault(
                     (record.source, json_text(item)),
-                    {"source": record.source, "entity": item, "source_record_ids": []},
+                    {
+                        "source": record.source,
+                        "properties": rdf_properties(item),
+                        "source_record_ids": [],
+                    },
                 )
                 variant["source_record_ids"].append(key)
             values["variants"] = list(variants.values())
