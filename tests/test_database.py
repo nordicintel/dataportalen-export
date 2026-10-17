@@ -11,6 +11,10 @@ from scripts.build_database import build_database
 
 def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
     record = json.loads((Path(__file__).parent / "fixtures/records.jsonl").read_text())
+    record["spatial_resource"] = [{"resource": "https://sws.geonames.org/2661886"}]
+    record["applicable_legislation"] = [
+        "http://data.europa.eu/eli/reg_impl/2023/138/oj"
+    ]
     source = tmp_path / "datasets.jsonl.gz"
     target = tmp_path / "catalog.db.zst"
     with gzip.open(source, "wt", encoding="utf-8") as stream:
@@ -85,6 +89,26 @@ def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
             ).fetchone()[0]
             == 1
         )
+        assert (
+            json.loads(
+                db.execute("SELECT spatial_resources FROM datasets").fetchone()[0]
+            )
+            == record["spatial_resource"]
+        )
+        assert (
+            json.loads(
+                db.execute("SELECT applicable_legislation FROM datasets").fetchone()[0]
+            )
+            == record["applicable_legislation"]
+        )
+        assert [
+            json.loads(r[0])
+            for r in db.execute("SELECT record_json FROM distributions ORDER BY id")
+        ] == record["distributions"]
+        service = record["distributions"][0]["access_service"][0]
+        assert json.loads(
+            db.execute("SELECT contact_points FROM data_services").fetchone()[0]
+        ) == service.get("contact_point", [])
         columns = [
             r
             for (table,) in db.execute(
@@ -92,7 +116,7 @@ def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
             ).fetchall()
             for r in db.execute(f"PRAGMA table_info({table})")
         ]
-        assert sum(r[2] == "JSON" for r in columns) == 34
+        assert sum(r[2] == "JSON" for r in columns) == 47
         assert not any(r[1].endswith(("_sv", "_en")) for r in columns)
     with gzip.open(source, "wt", encoding="utf-8") as stream:
         stream.write(json.dumps({"resource": "urn:new", "id": "new"}) + "\n")

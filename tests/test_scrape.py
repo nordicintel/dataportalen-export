@@ -12,7 +12,9 @@ def test_scroll_preserves_complete_records_filters_languages_and_replaces(
     tmp_path, monkeypatch
 ):
     config = load_config()
-    config["scrape"].update(page_size=2, countries=["se"], languages=["sv", "en"])
+    config["scrape"].update(
+        page_size=2, catalogs=["oppnadata"], countries=["se"], languages=["sv", "en"]
+    )
     output = tmp_path / "datasets.jsonl.gz"
     output.write_bytes(b"old export")
     record = {

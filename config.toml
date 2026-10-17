@@ -1,6 +1,6 @@
 [scrape]
-catalogs = ["oppnadata"]
-countries = [] # Country IDs, e.g. ["se"]. Combined with catalogs as a union.
+catalogs = []
+countries = ["se"] # All catalogs tagged Sweden by data.europa.eu.
 languages = ["sv", "en"] # Empty means keep all languages.
 page_size = 500
 max_attempts = 5
@@ -17,5 +17,5 @@ time = "06:00"
 timezone = "Europe/Stockholm"
 
 [database]
-enabled = false
+enabled = true
 zstd_level = 6

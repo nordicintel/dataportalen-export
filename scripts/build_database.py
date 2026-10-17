@@ -95,6 +95,9 @@ def build_database(
                                 "is_part_of": catalog.get("is_part_of"),
                                 "issued": catalog.get("issued"),
                                 "modified": catalog.get("modified"),
+                                "languages": items(catalog.get("language")),
+                                "publisher": owner,
+                                "record_json": catalog,
                             },
                             ignore=True,
                         )
@@ -131,6 +134,7 @@ def build_database(
                             "is_version_of",
                             "provenance",
                             "qualified_attribution",
+                            "is_referenced_by",
                         )
                         for value in items(row.get(key))
                     ]
@@ -176,6 +180,15 @@ def build_database(
                                 "full_available_languages"
                             )
                             or [],
+                            "country": row.get("country"),
+                            "type": row.get("type") or {},
+                            "spatial_resources": items(row.get("spatial_resource")),
+                            "applicable_legislation": items(
+                                row.get("applicable_legislation")
+                            ),
+                            "topic_categories": items(row.get("topic_category")),
+                            "reference_systems": items(row.get("reference_system")),
+                            "in_series": items(row.get("in_series")),
                             "spatial_geojson": items(row.get("spatial")),
                             "keywords": items(row.get("keywords")),
                             "categories": items(row.get("categories")),
@@ -246,6 +259,10 @@ def build_database(
                                 "applicable_legislation": items(
                                     distribution.get("applicable_legislation")
                                 ),
+                                "spatial_resolution_m": distribution.get(
+                                    "spatial_resolution_in_meters"
+                                ),
+                                "record_json": distribution,
                                 "data_service_count": len(services),
                             },
                         )
@@ -269,6 +286,11 @@ def build_database(
                                     ),
                                     "license_id": service.get("license"),
                                     "access_right": service.get("access_right"),
+                                    "contact_points": contacts,
+                                    "serves_datasets": items(
+                                        service.get("serves_dataset")
+                                    ),
+                                    "license": service.get("license") or {},
                                     "contact_name": contact.get("name"),
                                     "contact_email": contact.get("email"),
                                     "record_json": service,

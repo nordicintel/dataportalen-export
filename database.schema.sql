@@ -16,7 +16,10 @@ CREATE TABLE catalogs (
     source_type      TEXT,
     is_part_of       TEXT,
     issued           TEXT,
-    modified         TEXT
+    modified         TEXT,
+    languages        JSON NOT NULL DEFAULT '[]',
+    publisher        JSON NOT NULL DEFAULT '{}',
+    record_json      JSON NOT NULL CHECK (json_valid(record_json))
 );
 
 CREATE TABLE publishers (
@@ -54,6 +57,13 @@ CREATE TABLE datasets (
     spatial_resolution_m     REAL,
     distribution_count       INTEGER NOT NULL,
     available_languages      JSON NOT NULL DEFAULT '[]', -- JSON array
+    country                  TEXT,
+    type                     JSON NOT NULL DEFAULT '{}',
+    spatial_resources        JSON NOT NULL DEFAULT '[]',
+    applicable_legislation   JSON NOT NULL DEFAULT '[]',
+    topic_categories         JSON NOT NULL DEFAULT '[]',
+    reference_systems        JSON NOT NULL DEFAULT '[]',
+    in_series                JSON NOT NULL DEFAULT '[]',
     spatial_geojson          JSON NOT NULL DEFAULT '[]', -- JSON array of geometries
     keywords                 JSON NOT NULL DEFAULT '[]', -- JSON [{id,language,label}]
     categories               JSON NOT NULL DEFAULT '[]', -- JSON [{id,label:{sv,en},...}]
@@ -95,6 +105,8 @@ CREATE TABLE distributions (
     conforms_to               JSON NOT NULL DEFAULT '[]', -- JSON array
     pages                     JSON NOT NULL DEFAULT '[]', -- JSON array
     applicable_legislation    JSON NOT NULL DEFAULT '[]', -- JSON array
+    spatial_resolution_m      REAL,
+    record_json               JSON NOT NULL CHECK (json_valid(record_json)),
     data_service_count        INTEGER NOT NULL
 );
 
@@ -110,6 +122,9 @@ CREATE TABLE data_services (
     serves_dataset_count   INTEGER NOT NULL,
     license_id             TEXT,
     access_right           TEXT,
+    contact_points         JSON NOT NULL DEFAULT '[]',
+    serves_datasets        JSON NOT NULL DEFAULT '[]',
+    license                JSON NOT NULL DEFAULT '{}',
     contact_name           TEXT,
     contact_email          TEXT,
     record_json            JSON NOT NULL CHECK (json_valid(record_json))

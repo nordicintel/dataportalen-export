@@ -22,8 +22,8 @@ All operational settings live in [`config.toml`](config.toml):
 
 | Setting | Meaning |
 | --- | --- |
-| `scrape.catalogs` | Catalog IDs; defaults to `["oppnadata"] |
-| `scrape.countries` | Country IDs, e.g. `["se"]`; defaults to `[]` |
+| `scrape.catalogs` | Catalog IDs; defaults to `[]` |
+| `scrape.countries` | Country IDs; defaults to `["se"]` (all Swedish catalogs) |
 | `scrape.languages` | Language-map keys to retain; defaults to `["sv", "en"]`; `[]` keeps all |
 | `scrape.page_size` | Results per search page; defaults to 500 |
 | `scrape.max_attempts` | Total attempts per request, including the initial attempt; defaults to 5 |
@@ -36,7 +36,7 @@ All operational settings live in [`config.toml`](config.toml):
 | `schedule.interval_days` | Minimum local calendar days between successful JSONL publications |
 | `schedule.time` | Local daily time, `HH:MM`; defaults to `06:00` |
 | `schedule.timezone` | IANA timezone; defaults to `Europe/Stockholm` |
-| `database.enabled` | Also rebuild SQLite during Harvest; defaults to false |
+| `database.enabled` | Also rebuild SQLite during Harvest; defaults to true |
 | `database.zstd_level` | SQLite Zstandard compression level; defaults to 6 |
 
 Catalog and country selections form a **union**. A dataset matching both is written
@@ -76,10 +76,13 @@ the separate publication times.
 ## SQLite
 
 [`database.schema.sql`](database.schema.sql) defines five tables: `catalogs`,
-`publishers`, `datasets`, `distributions`, and `data_services`. Its 34 structured
+`publishers`, `datasets`, `distributions`, and `data_services`. Its 47 structured
 columns explicitly declare `JSON`. Language maps use keys such as `sv` and `en`.
 Keywords, categories, contacts, temporal coverage, creators, landing pages, and links
-are embedded JSON collections. Distribution URLs are one JSON object.
+are embedded JSON collections. Distribution URLs are one JSON object. Geographic references, coordinate reference systems, topic categories, applicable legislation,
+series memberships, full service contacts and served dataset references are directly
+queryable JSON columns. Catalogs and distributions also expose their complete
+`record_json`, so their nested metadata is accessible without joining back to datasets.
 
 Distribution and service row IDs are local integer keys. `distributions.source_id`
 preserves the source identifier, including distributions shared by multiple parents.
