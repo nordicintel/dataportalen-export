@@ -9,7 +9,8 @@ from rdflib import Graph
 
 from dataportalen_export.identity import stable_id
 from dataportalen_export.models.source_record import SourceRecord
-from dataportalen_export.rdf_converter import LINKS, MODELS, RdfConverter, graph_digest
+from dataportalen_export.rdf_converter import LINKS, MODELS, RdfConverter
+from dataportalen_export.rdf_graph import graph_digest
 
 SCHEMA_VERSION = 2
 

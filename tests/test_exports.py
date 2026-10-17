@@ -6,6 +6,7 @@ from pathlib import Path
 import duckdb
 import pytest
 from rdflib import BNode, Dataset, Graph
+from rdflib.compare import isomorphic
 
 from dataportalen_export.config import Config
 from dataportalen_export.current_state import CurrentState, make_record
@@ -64,6 +65,10 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     assert dataset["catalog_ids"]
     linked = Dataset().parse(next((path / "jsonld").glob("*.jsonld")), format="json-ld")
     assert len(linked) == len(graph)
+    represented = Graph()
+    for subject, predicate, obj, _ in linked.quads((None, None, None, None)):
+        represented.add((subject, predicate, obj))
+    assert isomorphic(represented, graph)
     with gzip.open(path / "source_records.jsonl.gz", "rt", encoding="utf-8") as stream:
         assert "rdf" in json.loads(next(stream))
     restored = CurrentState.load(path)

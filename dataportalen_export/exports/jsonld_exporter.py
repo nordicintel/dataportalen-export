@@ -2,9 +2,9 @@ import json
 from collections import defaultdict
 
 from rdflib import BNode, Graph
-from rdflib.compare import to_canonical_graph
 
 from dataportalen_export.rdf_converter import parse_rdf
+from dataportalen_export.rdf_graph import canonical_graph
 from dataportalen_export.schema import json_text
 
 CONTEXT = {
@@ -32,7 +32,7 @@ class JsonldExporter:
         for catalog in sorted(entities["catalogs"]):
             graphs = []
             for record_id in sorted(by_catalog[catalog]):
-                canonical = to_canonical_graph(parse_rdf(state.records[record_id].rdf))
+                canonical = canonical_graph(parse_rdf(state.records[record_id].rdf))
                 graph = Graph()
                 for triple in canonical:
                     graph.add(

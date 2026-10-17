@@ -10,7 +10,8 @@ from dataportalen_export.context_index import ContextIndex
 from dataportalen_export.current_state import SourceBatch, make_record
 from dataportalen_export.identity import stable_id
 from dataportalen_export.portal_client import DUMP
-from dataportalen_export.rdf_converter import closure, graph_digest
+from dataportalen_export.rdf_converter import closure
+from dataportalen_export.rdf_graph import graph_digest
 
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
 log = logging.getLogger(__name__)

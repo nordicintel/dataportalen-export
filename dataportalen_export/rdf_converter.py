@@ -6,7 +6,6 @@ from datetime import date, datetime
 
 import rdflib
 from rdflib import BNode, Graph, Literal, Namespace, URIRef
-from rdflib.compare import to_canonical_graph, to_isomorphic
 from rdflib.namespace import DCTERMS, FOAF, RDF
 
 from dataportalen_export.identity import stable_id
@@ -16,6 +15,7 @@ from dataportalen_export.models.dataset import Dataset
 from dataportalen_export.models.dataset_series import DatasetSeries
 from dataportalen_export.models.distribution import Distribution
 from dataportalen_export.models.publisher import Publisher
+from dataportalen_export.rdf_graph import canonical_graph
 
 rdflib.NORMALIZE_LITERALS = False
 DCAT = Namespace("http://www.w3.org/ns/dcat#")
@@ -50,10 +50,6 @@ LINKS = {
     "dataset_publishers": ("datasets", "publishers"),
     "series_publishers": ("dataset_series", "publishers"),
 }
-
-
-def graph_digest(graph: Graph) -> str:
-    return str(to_isomorphic(graph).graph_digest())
 
 
 def parse_rdf(text: str, format: str = "turtle") -> Graph:
@@ -128,7 +124,7 @@ class RdfConverter:
     def convert(
         self, graph: Graph, *, source: str, scope: str, aliases=None, catalog_ids=None
     ):
-        graph = to_canonical_graph(graph)
+        graph = canonical_graph(graph)
         aliases, catalog_ids = aliases or {}, catalog_ids or {}
         kinds = {}
         for node, rdf_type in graph.subject_objects(RDF.type):

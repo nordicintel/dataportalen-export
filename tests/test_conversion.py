@@ -1,8 +1,35 @@
+import subprocess
+import sys
 from pathlib import Path
 
 from rdflib import Graph, URIRef
 
-from dataportalen_export.rdf_converter import RdfConverter, graph_digest
+from dataportalen_export.rdf_converter import RdfConverter
+from dataportalen_export.rdf_graph import graph_digest
+
+
+def test_repeated_blank_node_components_do_not_stall_conversion():
+    # Reduced from Trafikverket resource/254, where whole-graph canonicalization
+    # stalled the hosted harvest. A subprocess bounds regression failures.
+    subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            """
+from rdflib import Graph
+from dataportalen_export.rdf_graph import canonical_graph, graph_digest
+graph = Graph().parse("tests/fixtures/repeated_blank_nodes.nt", format="nt")
+relabeled = Graph().parse(data=graph.serialize(format="nt"), format="nt")
+assert len(canonical_graph(graph)) == len(graph)
+assert graph_digest(graph) == graph_digest(relabeled)
+cycle = Graph().parse(data='_:a <urn:p> _:b . _:b <urn:p> _:a .', format="turtle")
+separate = Graph().parse(data='_:a <urn:p> _:a . _:b <urn:p> _:b .', format="turtle")
+assert graph_digest(cycle) != graph_digest(separate)
+""",
+        ],
+        check=True,
+        timeout=8,
+    )
 
 
 def test_fixture_preserves_six_entities_languages_literals_and_cycles():
