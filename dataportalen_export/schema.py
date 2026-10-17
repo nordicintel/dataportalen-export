@@ -120,6 +120,17 @@ STANDARD_TYPES = {
 }
 
 
+def rdf_properties(entity):
+    return {
+        predicate: [
+            {key: value for key, value in term.items() if value is not None}
+            for term in terms
+        ]
+        for predicate, terms in entity.get("extra_properties", {}).items()
+        if terms
+    }
+
+
 def object_json(entity):
     """Sparse consumer records; raw variants and RDF retain original source terms."""
     result = {
@@ -127,7 +138,7 @@ def object_json(entity):
         for key, value in entity.items()
         if key not in {"kind", "extra_properties"} and value not in (None, "", [], {})
     }
-    properties = dict(entity.get("extra_properties", {}))
+    properties = rdf_properties(entity)
     for name, predicate in PROJECTED.items():
         values = sorted(
             {

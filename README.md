@@ -99,7 +99,7 @@ Explicit projected fields avoid repeating their predicate values in `extra_prope
 that map contains unprojected predicates under full IRIs. This is a custom normalized
 JSON representation, not the original source format.
 
-`variants_json` retains parsed per-source object variants and their source-record IDs.
+`variants_json` retains per-source RDF predicate/term maps and their source-record IDs.
 Complete source-record metadata and RDF graphs are in the source exports. Per-record
 Turtle and JSON-LD are derived serializations; only the national dump is preserved
 as downloaded bytes. Source licenses, attribution, language tags, and unparsed

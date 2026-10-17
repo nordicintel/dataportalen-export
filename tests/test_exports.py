@@ -96,6 +96,13 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
             db.execute("select landing_pages_json from datasets").fetchone()[0]
             == '["https://example.org/landing"]'
         )
+        variant = json.loads(
+            db.execute("select variants_json from datasets").fetchone()[0]
+        )[0]
+        assert (
+            variant["properties"]["https://example.org/precision"][0]["value"]
+            == "1.2300"
+        )
         assert not db.execute("pragma foreign_key_check").fetchall()
         expected_tables = {
             name: sorted(db.execute(f'SELECT * FROM "{name}"').fetchall())
