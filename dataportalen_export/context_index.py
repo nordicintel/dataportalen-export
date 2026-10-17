@@ -27,9 +27,17 @@ class ContextIndex:
                 context = record.native_id.split(":", 2)[1]
                 for entity in record.entities:
                     if entity["kind"] == "catalogs":
-                        self.catalogs[context].append((entity["id"], set()))
+                        members = {
+                            value["id"]
+                            for value in entity["extra_properties"].get(
+                                str(DCAT.dataset), []
+                            )
+                            if "id" in value
+                        }
+                        self.catalogs[context].append((entity["id"], members))
         catalog_rows = await client.solr("rdfType:http\\://www.w3.org/ns/dcat#Catalog")
         fresh_catalogs = defaultdict(list)
+        failed_contexts = set()
 
         async def catalog(child):
             context, entry = str(child["contextId"]), str(child["entryId"])
@@ -65,6 +73,7 @@ class ContextIndex:
                 old = previous.get(record_id)
                 if old and old.digest == record.digest:
                     record.fetched_at = old.fetched_at
+                    record.rdf = old.rdf
                 batch.records[record_id] = record
                 for node in nodes:
                     fresh_catalogs[context].append(
@@ -74,9 +83,15 @@ class ContextIndex:
                         )
                     )
             except (httpx.HTTPError, ValueError) as error:
+                failed_contexts.add(context)
                 batch.failures[record_id] = str(error)[:400]
 
         await asyncio.gather(*(catalog(row) for row in catalog_rows))
+        for context in failed_contexts:
+            fresh_ids = {identifier for identifier, _ in fresh_catalogs[context]}
+            fresh_catalogs[context].extend(
+                row for row in self.catalogs[context] if row[0] not in fresh_ids
+            )
         self.catalogs.update(fresh_catalogs)
         for kind in ("Dataset", "DatasetSeries", "DataService"):
             rows = await client.solr(
@@ -87,7 +102,7 @@ class ContextIndex:
                 for props in (child.get("info") or {}).values():
                     for value in props.get("http://entrystore.org/terms/resource", []):
                         self.entries[value["value"]].add(context)
-        self.complete = True
+        self.complete = not failed_contexts
 
     def membership(self, uri: str):
         contexts = set(self.entries.get(uri, ()))

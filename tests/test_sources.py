@@ -1,9 +1,13 @@
 import asyncio
+from pathlib import Path
 
 import httpx
 import pytest
+from rdflib import Graph
 
 from dataportalen_export.config import Harvest
+from dataportalen_export.current_state import CurrentState
+from dataportalen_export.dataportal_source import DataportalSource
 from dataportalen_export.portal_client import PortalClient
 
 
@@ -38,6 +42,82 @@ def test_eu_listing_reconciles_repository_only_records_and_retries():
 
     asyncio.run(run())
     assert calls == 2
+
+
+def test_failed_catalog_metadata_preserves_known_memberships(tmp_path):
+    graph = Graph().parse(
+        Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
+    )
+    dump = graph.serialize(format="xml").encode()
+    catalog = """@prefix dcat: <http://www.w3.org/ns/dcat#> .
+        <https://example.org/catalog> a dcat:Catalog;
+            dcat:dataset <https://example.org/Dataset>, <https://example.org/series> .
+        <https://example.org/another> a dcat:Catalog; <https://example.org/detail> _:a .
+        _:a <https://example.org/next> _:b . _:b <https://example.org/next> _:a ."""
+    fail_metadata = False
+
+    def respond(request):
+        if request.url.path == "/all.rdf":
+            return httpx.Response(200, content=dump)
+        if "/metadata/" in request.url.path:
+            return httpx.Response(404 if fail_metadata else 200, text=catalog)
+        query = request.url.params["query"]
+        if "#Catalog" in query:
+            rows = [{"contextId": "context", "entryId": "catalog"}]
+        else:
+            uri = "series" if "#DatasetSeries" in query else "Dataset"
+            rows = [
+                {
+                    "contextId": "context",
+                    "entryId": uri,
+                    "info": {
+                        "entry": {
+                            "http://entrystore.org/terms/resource": [
+                                {"value": "https://example.org/" + uri}
+                            ]
+                        }
+                    },
+                }
+            ]
+        return httpx.Response(
+            200, json={"results": len(rows), "resource": {"children": rows}}
+        )
+
+    async def run():
+        nonlocal fail_metadata
+        async with PortalClient(
+            Harvest(), transport=httpx.MockTransport(respond)
+        ) as client:
+            first, _ = await DataportalSource().harvest(client, {}, tmp_path)
+            state = CurrentState(first.records)
+            unchanged, _ = await DataportalSource().harvest(
+                client, state.records, tmp_path
+            )
+            assert {key: record.rdf for key, record in unchanged.records.items()} == {
+                key: record.rdf for key, record in first.records.items()
+            }
+            before = {
+                r.root_uri: r.catalog_ids
+                for r in first.records.values()
+                if r.catalog_ids
+            }
+            assert "https://example.org/Dataset" in before
+            assert "https://example.org/series" in before
+            fail_metadata = True
+            second, _ = await DataportalSource().harvest(
+                client, state.records, tmp_path
+            )
+            state.apply(second)
+            assert not second.complete_scopes
+            assert second.failures
+            after = {
+                r.root_uri: r.catalog_ids
+                for r in state.records.values()
+                if r.catalog_ids
+            }
+            assert after == before
+
+    asyncio.run(run())
 
 
 def test_truncated_listing_does_not_look_complete():

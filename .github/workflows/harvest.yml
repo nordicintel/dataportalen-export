@@ -43,9 +43,9 @@ jobs:
           FORCE_REFRESH: ${{ inputs.force }}
         run: |
           if [ "$FORCE_REFRESH" = "true" ]; then
-            uv run --no-dev python -m dataportalen_export --force
+            /usr/bin/time -v uv run --no-dev python -m dataportalen_export --force
           else
-            uv run --no-dev python -m dataportalen_export
+            /usr/bin/time -v uv run --no-dev python -m dataportalen_export
           fi
       - name: Record attempt and publish
         if: always() && steps.schedule.outputs.due == 'true'

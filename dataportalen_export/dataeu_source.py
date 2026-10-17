@@ -56,6 +56,7 @@ class DataEuSource:
                 old = previous.get(catalog_key)
                 if old and old.digest == batch.records[catalog_key].digest:
                     batch.records[catalog_key].fetched_at = old.fetched_at
+                    batch.records[catalog_key].rdf = old.rdf
             except (httpx.HTTPError, ValueError) as error:
                 batch.failures[catalog_key] = str(error)[:400]
             try:
@@ -150,6 +151,7 @@ class DataEuSource:
                     )
                     if old and old.digest == record.digest:
                         record.fetched_at = old.fetched_at
+                        record.rdf = old.rdf
                     batch.records[key] = record
                     batch.fetched += 1
                 except (httpx.HTTPError, ValueError) as error:

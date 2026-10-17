@@ -79,6 +79,9 @@ class DataportalSource:
                         stamp=digest,
                         catalog_ids=catalogs,
                     )
+                    if old and old.digest == digest:
+                        batch.records[key].fetched_at = old.fetched_at
+                        batch.records[key].rdf = old.rdf
                     batch.fetched += 1
             except ValueError as error:
                 batch.failures[key] = str(error)[:400]
