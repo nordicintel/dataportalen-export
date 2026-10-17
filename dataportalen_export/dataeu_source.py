@@ -41,7 +41,7 @@ class DataEuSource:
                     accept="text/turtle",
                 )
                 graph = parse_rdf(response.content.decode("utf-8"))
-                nodes = list(graph.subjects(RDF.type, DCAT.Catalog))
+                nodes = sorted(graph.subjects(RDF.type, DCAT.Catalog), key=str)
                 if not nodes:
                     raise ValueError("No catalog resource in EU metadata")
                 batch.records[catalog_key] = make_record(

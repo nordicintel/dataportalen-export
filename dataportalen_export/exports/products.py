@@ -144,6 +144,8 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                 "source": batch.source,
                 "successful_scopes": sorted(batch.successful_scopes),
                 "complete_scopes": sorted(batch.complete_scopes),
+                "enumerated_records": len(batch.seen),
+                "accepted_records": len(batch.records),
                 "fetched": batch.fetched,
                 "reused": batch.reused,
                 "failure_count": len(batch.failures),
@@ -160,6 +162,10 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             "table_counts": {table: len(spec[2]) for table, spec in tables.items()},
             "record_count": len(state.records),
             "stale_records": sum(r.stale for r in state.records.values()),
+            "datasets_without_catalog": len(
+                set(entities["datasets"])
+                - {right for table, left, right in links if table == "catalog_datasets"}
+            ),
             "deleted_records": state.deleted,
             "failures": failures,
             "omissions": omissions,

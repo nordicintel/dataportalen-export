@@ -41,6 +41,7 @@ TYPES = {
 LINKS = {
     "catalog_datasets": ("catalogs", "datasets"),
     "catalog_series": ("catalogs", "dataset_series"),
+    "catalog_services": ("catalogs", "data_services"),
     "series_datasets": ("dataset_series", "datasets"),
     "dataset_distributions": ("datasets", "distributions"),
     "distribution_services": ("distributions", "data_services"),
@@ -233,6 +234,7 @@ class RdfConverter:
                 "catalogs": [
                     (DCAT.dataset, "catalog_datasets", "datasets", False),
                     (DCAT.dataset, "catalog_series", "dataset_series", False),
+                    (DCAT.service, "catalog_services", "data_services", False),
                 ],
                 "datasets": [
                     (

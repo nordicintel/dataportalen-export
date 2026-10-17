@@ -28,9 +28,7 @@ class ContextIndex:
                 for entity in record.entities:
                     if entity["kind"] == "catalogs":
                         self.catalogs[context].append((entity["id"], set()))
-        catalog_rows = await client.solr(
-            "rdfType:http\\://www.w3.org/ns/dcat#Catalog AND public:true"
-        )
+        catalog_rows = await client.solr("rdfType:http\\://www.w3.org/ns/dcat#Catalog")
         fresh_catalogs = defaultdict(list)
 
         async def catalog(child):
@@ -45,7 +43,7 @@ class ContextIndex:
                     accept="text/turtle",
                 )
                 graph = parse_rdf(response.content.decode("utf-8"))
-                nodes = list(graph.subjects(None, DCAT.Catalog))
+                nodes = sorted(graph.subjects(None, DCAT.Catalog), key=str)
                 if not nodes:
                     raise ValueError("Catalog resource missing")
                 ids = {
@@ -80,7 +78,7 @@ class ContextIndex:
 
         await asyncio.gather(*(catalog(row) for row in catalog_rows))
         self.catalogs.update(fresh_catalogs)
-        for kind in ("Dataset", "DatasetSeries"):
+        for kind in ("Dataset", "DatasetSeries", "DataService"):
             rows = await client.solr(
                 f"rdfType:http\\://www.w3.org/ns/dcat#{kind} AND public:true"
             )

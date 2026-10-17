@@ -34,7 +34,7 @@ class DataportalSource:
         nodes = sorted(
             {
                 node
-                for kind in (DCAT.Dataset, DCAT.DatasetSeries)
+                for kind in (DCAT.Dataset, DCAT.DatasetSeries, DCAT.DataService)
                 for node in graph.subjects(RDF.type, kind)
                 if isinstance(node, URIRef)
             }

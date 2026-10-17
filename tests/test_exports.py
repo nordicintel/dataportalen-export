@@ -5,10 +5,11 @@ from pathlib import Path
 
 import duckdb
 import pytest
-from rdflib import Dataset, Graph
+from rdflib import BNode, Dataset, Graph
 
 from dataportalen_export.config import Config
 from dataportalen_export.current_state import CurrentState, make_record
+from dataportalen_export.exports.jsonld_exporter import JsonldExporter
 from dataportalen_export.exports.products import validate_products, write_products
 
 
@@ -73,3 +74,27 @@ def test_export_failure_preserves_previous_directory(tmp_path):
     with pytest.raises(ValueError):
         write_products(state, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (config.output.directory / "manifest.json").read_bytes() == before
+
+
+def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
+    state, graph = fixture_state()
+    other = make_record(
+        graph,
+        source="dataeu",
+        native_id="other",
+        scope="dataeu:test",
+        root_uri="https://example.org/Dataset",
+        stamp="two",
+    )
+    state.records[other.id] = other
+    entities, links, provenance = state.materialize()
+    JsonldExporter().write(tmp_path, state, entities, links, provenance)
+    catalog = next(iter(entities["catalogs"]))
+    dataset = Dataset().parse(tmp_path / f"{catalog}.jsonld", format="json-ld")
+    blank_sets = [
+        {node for triple in graph for node in triple if isinstance(node, BNode)}
+        for graph in dataset.graphs()
+        if len(graph)
+    ]
+    assert len(blank_sets) == 2
+    assert not blank_sets[0] & blank_sets[1]

@@ -4,7 +4,7 @@
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix ex: <https://example.org/> .
 ex:catalog a dcat:Catalog; dct:title "Catalog"@en; dct:publisher ex:publisher;
-  dcat:dataset ex:Dataset; dcat:record ex:record .
+  dcat:dataset ex:Dataset; dcat:service ex:service; dcat:record ex:record .
 ex:Dataset a dcat:Dataset; dct:title "Befolkning"@sv, "Population"@en, "Väestö"@fi;
   dct:issued "not-a-date"; dct:publisher ex:publisher;
   dcat:distribution ex:distribution; dcat:inSeries ex:series;

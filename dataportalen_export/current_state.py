@@ -11,7 +11,7 @@ from dataportalen_export.identity import stable_id
 from dataportalen_export.models.source_record import SourceRecord
 from dataportalen_export.rdf_converter import LINKS, MODELS, RdfConverter, graph_digest
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def now_iso():
@@ -113,12 +113,14 @@ class CurrentState:
                 entities[kind].setdefault(identifier, item)
                 provenance.add((kind, identifier, record.id))
                 if (
-                    kind in {"datasets", "dataset_series"}
+                    kind in {"datasets", "dataset_series", "data_services"}
                     and item.get("uri") == record.root_uri
                 ):
-                    table = (
-                        "catalog_datasets" if kind == "datasets" else "catalog_series"
-                    )
+                    table = {
+                        "datasets": "catalog_datasets",
+                        "dataset_series": "catalog_series",
+                        "data_services": "catalog_services",
+                    }[kind]
                     links.update(
                         (table, catalog, identifier) for catalog in record.catalog_ids
                     )

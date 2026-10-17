@@ -27,6 +27,7 @@ def test_fixture_preserves_six_entities_languages_literals_and_cycles():
         == "1.2300"
     )
     assert any(link[0] == "dataset_distributions" for link in links)
+    assert any(link[0] == "catalog_services" for link in links)
     assert dataset.id != converter.entity_id("datasets", "https://example.org/dataset")
     relabeled = Graph().parse(data=graph.serialize(format="turtle"), format="turtle")
     assert graph_digest(graph) == graph_digest(relabeled)
