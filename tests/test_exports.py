@@ -115,8 +115,10 @@ def test_xz_products_are_readable_and_reusable(tmp_path):
         assert db.execute("select count(*) from datasets").fetchone()[0] == 1
     restored = CurrentState.load(path)
     assert restored.records.keys() == state.records.keys()
+    os.utime(path / "source_records.jsonl.xz", (1000000000, 1000000000))
     write_products(restored, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (path / "catalog.db.xz").read_bytes() == before
+    assert (path / "source_records.jsonl.xz").stat().st_mtime == 1000000000
     validate_products(path)
 
 

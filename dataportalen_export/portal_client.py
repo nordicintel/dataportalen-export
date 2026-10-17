@@ -157,13 +157,13 @@ class PortalClient:
                 "filter": "catalogue",
                 "limit": 200,
                 "facets": json.dumps({"country": countries}),
-                "includes": "id,count",
+                "includes": "id,modified",
             },
         )
         rows = response.json()["result"]["results"]
         if len(rows) >= 200:
             raise ValueError("Catalog listing may be truncated")
-        return [str(row["id"]) for row in rows]
+        return {str(row["id"]): str(row.get("modified") or "") for row in rows}
 
     async def eu_listing(self, catalog: str):
         response = await self.get(

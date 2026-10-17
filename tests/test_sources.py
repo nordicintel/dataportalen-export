@@ -5,8 +5,9 @@ import httpx
 import pytest
 from rdflib import Graph
 
-from dataportalen_export.config import Harvest
+from dataportalen_export.config import Harvest, Sources
 from dataportalen_export.current_state import CurrentState
+from dataportalen_export.dataeu_source import DataEuSource
 from dataportalen_export.dataportal_source import DataportalSource
 from dataportalen_export.portal_client import PortalClient
 
@@ -265,5 +266,61 @@ def test_dataportal_skips_unchanged_dump_and_catalog_downloads(tmp_path):
                 force=True,
             )
             assert downloaded[-2:] == ["dump", "catalog"]
+
+    asyncio.run(run())
+
+
+def test_eu_skips_unchanged_catalog_and_dataset_metadata():
+    stamp = "2026-10-17T00:00:00Z"
+    downloaded = []
+
+    def respond(request):
+        path = request.url.path
+        if path.endswith("/search"):
+            catalog = request.url.params["filter"] == "catalogue"
+            row = (
+                {"id": "test", "modified": stamp}
+                if catalog
+                else {"id": "dataset", "catalog_record": {"modified": stamp}}
+            )
+            return httpx.Response(200, json={"result": {"count": 1, "results": [row]}})
+        if path.endswith("/datasets"):
+            return httpx.Response(200, json=["dataset"])
+        downloaded.append(path)
+        if "/catalogues/" in path:
+            return httpx.Response(
+                200,
+                text=f'<urn:catalog> a <http://www.w3.org/ns/dcat#Catalog>; <http://purl.org/dc/terms/modified> "{stamp}" .',
+            )
+        if "/datasets/" in path:
+            return httpx.Response(
+                200,
+                text="<urn:dataset> a <http://www.w3.org/ns/dcat#Dataset>; <http://www.w3.org/ns/dcat#distribution> <urn:distribution> .",
+            )
+        if "/distributions/" in path:
+            return httpx.Response(
+                200,
+                text="<urn:distribution> a <http://www.w3.org/ns/dcat#Distribution> .",
+            )
+        return httpx.Response(404)
+
+    async def run():
+        async with PortalClient(
+            Harvest(), transport=httpx.MockTransport(respond)
+        ) as client:
+            first = await DataEuSource().harvest(client, {}, Sources())
+            assert not first.failures
+            assert (
+                len(CurrentState(first.records).materialize()[0]["distributions"]) == 1
+            )
+            count = len(downloaded)
+            # Existing exports already retain the catalog's own modification value.
+            next(
+                r for r in first.records.values() if r.native_id.startswith("catalog:")
+            ).stamp = ""
+            second = await DataEuSource().harvest(client, first.records, Sources())
+            assert len(downloaded) == count
+            assert second.reused == 2
+            assert second.records == first.records
 
     asyncio.run(run())

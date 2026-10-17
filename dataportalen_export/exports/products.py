@@ -74,22 +74,40 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         with raw_records.open("w", encoding="utf-8", newline="\n") as stream:
             for record in sorted(state.records.values(), key=lambda r: r.id):
                 stream.write(json_text(record.model_dump()) + "\n")
-        state_file = compress_file(
-            raw_records, config.output.compression, config.output.compression_level
-        )
-        content_digest = checksum(state_file)
         previous_manifest = (
             json.loads((output / "manifest.json").read_text())
             if (output / "manifest.json").exists()
             else {}
         )
+        state_digest = checksum(raw_records)
+        previous_state_digest = previous_manifest.get("state_digest")
+        old_state = output / (
+            "source_records.jsonl."
+            + ("xz" if config.output.compression == "xz" else "gz")
+        )
+        if old_state.exists() and previous_state_digest is None:
+            opener = lzma.open if old_state.suffix == ".xz" else gzip.open
+            with opener(old_state, "rb") as stream:
+                previous_state_digest = hashlib.file_digest(
+                    stream, "sha256"
+                ).hexdigest()
+        state_reused = old_state.exists() and previous_state_digest == state_digest
+        if state_reused:
+            state_file = candidate / old_state.name
+            shutil.copy2(old_state, state_file)
+            raw_records.unlink()
+        else:
+            state_file = compress_file(
+                raw_records, config.output.compression, config.output.compression_level
+            )
+        content_digest = checksum(state_file)
         reusable = (
             previous_manifest.get("schema_version") == SCHEMA_VERSION
-            and previous_manifest.get("content_digest") == content_digest
+            and previous_state_digest == state_digest
         )
 
         product_digests = {}
-        reused_files = 0
+        reused_files = int(state_reused)
 
         def reuse(name, digest=None):
             nonlocal reused_files
@@ -202,6 +220,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             "status": "warnings" if failures or omissions else "success",
             "sources": outcomes,
             "content_digest": content_digest,
+            "state_digest": state_digest,
             "product_digests": product_digests,
             "reused_files": reused_files,
             "entity_counts": {kind: len(rows) for kind, rows in entities.items()},
