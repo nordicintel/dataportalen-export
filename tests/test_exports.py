@@ -146,7 +146,7 @@ def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
     assert not blank_sets[0] & blank_sets[1]
 
 
-def test_only_changed_catalog_products_are_rebuilt(tmp_path):
+def test_only_changed_catalog_products_are_rebuilt(tmp_path, monkeypatch):
     state, graph = fixture_state()
     other_graph = Graph().parse(
         data=graph.serialize(format="turtle").replace(
@@ -170,6 +170,7 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path):
     unchanged_paths = [
         config.output.directory / "catalogs" / other_catalog / "datasets.jsonl",
         config.output.directory / "jsonld" / f"{other_catalog}.jsonld",
+        config.output.directory / "parquet" / "distributions.parquet",
     ]
     before = {path: path.read_bytes() for path in unchanged_paths}
     for path in unchanged_paths:
@@ -190,7 +191,21 @@ def test_only_changed_catalog_products_are_rebuilt(tmp_path):
         stamp="two",
     )
     state.records[changed.id] = changed
-    write_products(state, config, [], attempted_at="second")
+    original_open = Path.open
+
+    def guarded_open(path, *args, **kwargs):
+        # Reused products must not be reserialized, hashed or parsed for validation.
+        assert other_catalog not in str(path), (
+            f"Opened unrelated catalog product {path}"
+        )
+        assert path.name != "distributions.parquet", (
+            "Reopened an unchanged Parquet table"
+        )
+        return original_open(path, *args, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", guarded_open)
+        write_products(state, config, [], attempted_at="second")
     for path in unchanged_paths:
         assert path.read_bytes() == before[path]
         assert path.stat().st_mtime == 1000000000

@@ -49,6 +49,10 @@ def main():
             "omissions",
         )
     }
+    summary.update(
+        no_changes=manifest.get("no_changes", False),
+        reused_files=manifest.get("reused_files", 0),
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     if summary_file := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary_file, "a", encoding="utf-8") as stream:

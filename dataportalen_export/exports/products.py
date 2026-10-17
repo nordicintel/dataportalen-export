@@ -16,9 +16,10 @@ from rdflib import Dataset
 
 from dataportalen_export.current_state import SCHEMA_VERSION
 from dataportalen_export.exports.duckdb_exporter import DuckdbExporter
-from dataportalen_export.exports.jsonl_exporter import JsonlExporter
+from dataportalen_export.exports.jsonl_exporter import JsonlExporter, rows_digest
 from dataportalen_export.exports.jsonld_exporter import JsonldExporter
 from dataportalen_export.exports.sqlite_exporter import SqliteExporter
+from dataportalen_export.refresh import configuration_signature
 from dataportalen_export.schema import json_text, tables_for
 
 log = logging.getLogger(__name__)
@@ -44,7 +45,18 @@ def compress_file(path, method, level):
     return target
 
 
-def write_products(state, config, batches, *, attempted_at, raw_dump=None):
+def retain_file(source, target):
+    """Keep accepted bytes without reading/copying them when on the same filesystem."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(source, target)
+    except OSError:
+        shutil.copy2(source, target)
+
+
+def write_products(
+    state, config, batches, *, attempted_at, raw_dump=None, checkpoints=None
+):
     output = config.output.directory.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     if (
@@ -79,6 +91,11 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             if (output / "manifest.json").exists()
             else {}
         )
+        settings_match = previous_manifest.get("configuration_signature") in (
+            None,
+            configuration_signature(config),
+        )
+        retained_files = set()
         state_digest = checksum(raw_records)
         previous_state_digest = previous_manifest.get("state_digest")
         old_state = output / (
@@ -91,10 +108,15 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                 previous_state_digest = hashlib.file_digest(
                     stream, "sha256"
                 ).hexdigest()
-        state_reused = old_state.exists() and previous_state_digest == state_digest
+        state_reused = (
+            settings_match
+            and old_state.exists()
+            and previous_state_digest == state_digest
+        )
         if state_reused:
             state_file = candidate / old_state.name
-            shutil.copy2(old_state, state_file)
+            retain_file(old_state, state_file)
+            retained_files.add(old_state.name)
             raw_records.unlink()
         else:
             state_file = compress_file(
@@ -103,6 +125,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         content_digest = checksum(state_file)
         reusable = (
             previous_manifest.get("schema_version") == SCHEMA_VERSION
+            and settings_match
             and previous_state_digest == state_digest
         )
 
@@ -115,6 +138,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                 product_digests[name] = digest
             matches = (
                 digest is not None
+                and settings_match
                 and previous_manifest.get("schema_version") == SCHEMA_VERSION
                 and previous_manifest.get("product_digests", {}).get(name) == digest
             )
@@ -124,7 +148,8 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                     if old.exists():
                         target = candidate / (name + suffix)
                         target.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copy2(old, target)
+                        retain_file(old, target)
+                        retained_files.add((name + suffix))
                         reused_files += 1
                         return True
             return False
@@ -133,24 +158,21 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             log.info("Writing SQLite")
             SqliteExporter().write(candidate / "catalog.db", tables)
         duck_reused = config.output.duckdb and reuse("catalog.duckdb")
-        parquet_reused = (
-            reusable and config.output.parquet and (output / "parquet").exists()
-        )
-        if parquet_reused:
-            shutil.copytree(output / "parquet", candidate / "parquet")
-            reused_files += len(list((candidate / "parquet").glob("*.parquet")))
-        if (config.output.duckdb and not duck_reused) or (
-            config.output.parquet and not parquet_reused
-        ):
+        changed_parquet = set()
+        if config.output.parquet:
+            for table, (columns, constraints, rows) in tables.items():
+                digest = rows_digest((columns, constraints, *rows))
+                if not reuse(f"parquet/{table}.parquet", digest):
+                    changed_parquet.add(table)
+        if (config.output.duckdb and not duck_reused) or changed_parquet:
             log.info("Writing DuckDB/Parquet")
             DuckdbExporter().write(
                 candidate / "catalog.duckdb"
                 if config.output.duckdb and not duck_reused
                 else None,
                 tables,
-                parquet_directory=candidate / "parquet"
-                if config.output.parquet and not parquet_reused
-                else None,
+                parquet_directory=candidate / "parquet" if changed_parquet else None,
+                parquet_tables=changed_parquet,
                 memory_limit_mb=config.output.duckdb_memory_limit_mb,
             )
         JsonlExporter().write(
@@ -165,7 +187,11 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         raw_dump = raw_dump or (previous_raw if previous_raw.exists() else None)
         if raw_dump:
             (candidate / "raw").mkdir()
-            shutil.copyfile(raw_dump, candidate / "raw/dataportal.rdf.gz")
+            if raw_dump.resolve() == previous_raw.resolve():
+                retain_file(raw_dump, candidate / "raw/dataportal.rdf.gz")
+                retained_files.add("raw/dataportal.rdf.gz")
+            else:
+                shutil.copyfile(raw_dump, candidate / "raw/dataportal.rdf.gz")
         omissions = []
         log.info("Reused %d unchanged product files", reused_files)
         for path in sorted(candidate.rglob("*")):
@@ -217,6 +243,9 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         manifest = {
             "schema_version": SCHEMA_VERSION,
             "attempted_at": attempted_at,
+            "configuration_signature": configuration_signature(config),
+            "checkpoints": checkpoints or {},
+            "no_changes": False,
             "status": "warnings" if failures or omissions else "success",
             "sources": outcomes,
             "content_digest": content_digest,
@@ -234,20 +263,34 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             "deleted_records": state.deleted,
             "failures": failures,
             "omissions": omissions,
-            "files": {
-                str(path.relative_to(candidate)).replace("\\", "/"): {
+            "files": {},
+        }
+        for path in sorted(candidate.rglob("*")):
+            if not path.is_file():
+                continue
+            name = path.relative_to(candidate).as_posix()
+            prior = previous_manifest.get("files", {}).get(name)
+            if (
+                name in retained_files
+                and prior
+                and path.stat().st_size == prior["bytes"]
+            ):
+                manifest["files"][name] = prior
+            else:
+                retained_files.discard(name)
+                manifest["files"][name] = {
                     "bytes": path.stat().st_size,
                     "sha256": checksum(path),
                 }
-                for path in sorted(candidate.rglob("*"))
-                if path.is_file()
-            },
-        }
         (candidate / "manifest.json").write_text(
             json_text(manifest) + "\n", encoding="utf-8"
         )
-        log.info("Validating candidate outputs")
-        validate_products(candidate)
+        log.info(
+            "Validating %d changed products; retaining %d previously validated products",
+            len(manifest["files"]) - len(retained_files),
+            len(retained_files),
+        )
+        validate_products(candidate, unchanged_files=retained_files)
         # Both moves stay within the configured output parent and our owned temp directory.
         backup = root / "previous"
         if output.exists():
@@ -261,11 +304,15 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         return manifest
 
 
-def validate_products(directory: Path):
+def validate_products(directory: Path, *, unchanged_files=frozenset()):
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     with tempfile.TemporaryDirectory(prefix="validate-") as temporary:
         for name, info in manifest["files"].items():
             path = directory / name
+            if name in unchanged_files:
+                if path.stat().st_size != info["bytes"]:
+                    raise ValueError(f"Retained product size mismatch: {name}")
+                continue
             if path.stat().st_size != info["bytes"] or checksum(path) != info["sha256"]:
                 raise ValueError(f"Checksum mismatch: {name}")
             original_name = name.removesuffix(".gz").removesuffix(".xz")

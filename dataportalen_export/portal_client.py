@@ -40,14 +40,20 @@ class PortalClient:
         await self.client.aclose()
 
     async def get(
-        self, url: str, *, params=None, accept="application/json", optional=False
+        self,
+        url: str,
+        *,
+        params=None,
+        accept="application/json",
+        optional=False,
+        method="GET",
     ):
         for attempt in range(self.settings.max_attempts):
             response = None
             try:
                 async with self.semaphore:
-                    response = await self.client.get(
-                        url, params=params, headers={"Accept": accept}
+                    response = await self.client.request(
+                        method, url, params=params, headers={"Accept": accept}
                     )
                 if optional and response.status_code == 404:
                     return None
@@ -149,6 +155,38 @@ class PortalClient:
         if len(rows) != total:
             raise ValueError(f"Incomplete EntryScape listing: {len(rows)}/{total}")
         return rows
+
+    async def context_counts(self, *, since=None):
+        """Small grouped change check through Dataportal's documented catalog API."""
+        kinds = " OR ".join(
+            f"rdfType:http\\://www.w3.org/ns/dcat#{kind}"
+            for kind in ("Catalog", "Dataset", "DatasetSeries", "DataService")
+        )
+        query = f"public:true AND ({kinds})"
+        if since:
+            query += f" AND modified:[{since} TO *]"
+        result = (
+            await self.get(
+                f"{STORE}/search",
+                params={
+                    "type": "solr",
+                    "query": query,
+                    "limit": 1,
+                    "facetFields": "context",
+                    "facetLimit": 1000,
+                },
+            )
+        ).json()
+        facet = next(f for f in result["facetFields"] if f["name"] == "context")
+        counts = {
+            v["name"].rstrip("/").rsplit("/", 1)[-1]: int(v["count"])
+            for v in facet["values"]
+        }
+        if len(counts) != int(facet["valueCount"]) or sum(counts.values()) != int(
+            result["results"]
+        ):
+            raise ValueError("Incomplete Dataportal context counts")
+        return counts
 
     async def eu_catalogs(self, countries):
         response = await self.get(

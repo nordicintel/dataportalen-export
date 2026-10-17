@@ -16,13 +16,15 @@ log = logging.getLogger(__name__)
 
 
 class DataEuSource:
-    async def harvest(self, client, previous, settings, *, force=False):
+    async def harvest(self, client, previous, settings, *, force=False, check=None):
         batch = SourceBatch("dataeu")
         try:
             catalogs = {
                 catalog: stamp
                 for catalog, stamp in (
-                    await client.eu_catalogs(settings.countries)
+                    check.eu_catalogs
+                    if check and check.eu_catalogs is not None
+                    else await client.eu_catalogs(settings.countries)
                 ).items()
                 if catalog not in settings.exclude_eu_catalogs
             }
@@ -33,6 +35,31 @@ class DataEuSource:
             return batch
         for catalog, catalog_stamp in catalogs.items():
             scope = f"dataeu:{catalog}"
+            if (
+                check
+                and catalog in check.unchanged_eu
+                and not any(
+                    record.stale
+                    for record in previous.values()
+                    if record.scope == scope
+                )
+            ):
+                retained = {
+                    key: record
+                    for key, record in previous.items()
+                    if record.scope == scope
+                }
+                batch.records.update(retained)
+                batch.seen.update(retained)
+                batch.reused += len(retained)
+                batch.complete_scopes.add(scope)
+                batch.successful_scopes.add(scope)
+                log.info(
+                    "EU catalog %s unchanged; reusing %d records",
+                    catalog,
+                    len(retained),
+                )
+                continue
             catalog_id = stable_id("catalogs", scope)
             catalog_native = f"catalog:{catalog}"
             catalog_key = stable_id("source", f"dataeu:{catalog_native}")
@@ -87,7 +114,11 @@ class DataEuSource:
             except (httpx.HTTPError, ValueError) as error:
                 batch.failures[catalog_key] = str(error)[:400]
             try:
-                refs = await client.eu_listing(catalog)
+                refs = (
+                    check.eu_listings[catalog]
+                    if check and catalog in check.eu_listings
+                    else await client.eu_listing(catalog)
+                )
             except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
                 batch.failures[scope] = str(error)[:400]
                 continue

@@ -324,3 +324,127 @@ def test_eu_skips_unchanged_catalog_and_dataset_metadata():
             assert second.records == first.records
 
     asyncio.run(run())
+
+
+def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path):
+    graph = Graph().parse(
+        Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
+    )
+    graph += Graph().parse(
+        data=graph.serialize(format="turtle").replace(
+            "https://example.org/", "https://other.example.org/"
+        ),
+        format="turtle",
+    )
+    stamp = "one"
+    queries, metadata = [], []
+    scoped = False
+    removed = False
+
+    def respond(request):
+        if request.url.path == "/all.rdf":
+            if request.headers.get("If-None-Match"):
+                return httpx.Response(304)
+            return httpx.Response(
+                200,
+                content=graph.serialize(format="xml").encode(),
+                headers={"ETag": '"same"'},
+            )
+        if "/metadata/" in request.url.path:
+            context = request.url.path.split("/")[2]
+            metadata.append(context)
+            prefix = (
+                "https://example.org/"
+                if context == "one"
+                else "https://other.example.org/"
+            )
+            return httpx.Response(
+                200, text=f"<{prefix}catalog> a <http://www.w3.org/ns/dcat#Catalog> ."
+            )
+        query = request.url.params["query"]
+        queries.append(query)
+        if scoped:
+            assert "context:" in query and "/one" in query and "/two" not in query
+        rows = []
+        for context, prefix in (
+            ("one", "https://example.org/"),
+            ("two", "https://other.example.org/"),
+        ):
+            if scoped and (context != "one" or removed):
+                continue
+            kind = "catalog" if "#Catalog" in query else "Dataset"
+            if "#DatasetSeries" in query or "#DataService" in query:
+                continue
+            rows.append(
+                {
+                    "contextId": context,
+                    "entryId": kind,
+                    "info": {
+                        "entry": {
+                            "http://purl.org/dc/terms/modified": [{"value": stamp}],
+                            "http://entrystore.org/terms/resource": [
+                                {"value": prefix + kind}
+                            ],
+                        }
+                    },
+                }
+            )
+        return httpx.Response(
+            200, json={"results": len(rows), "resource": {"children": rows}}
+        )
+
+    async def run():
+        nonlocal stamp, scoped, removed
+        async with PortalClient(
+            Harvest(), transport=httpx.MockTransport(respond)
+        ) as client:
+            first, raw = await DataportalSource().harvest(
+                client, {}, tmp_path / "first"
+            )
+            status = {
+                "http": first.http,
+                "complete_scopes": ["dataportal"],
+                "failure_count": 0,
+            }
+            old_other = next(
+                r
+                for r in first.records.values()
+                if r.root_uri == "https://other.example.org/Dataset"
+            )
+            assert old_other.catalog_ids
+            stamp, scoped = "two", True
+            queries.clear()
+            metadata.clear()
+            second, _ = await DataportalSource().harvest(
+                client,
+                first.records,
+                tmp_path / "second",
+                cached_dump=raw,
+                previous_status=status,
+                changed_contexts={"one"},
+            )
+            assert not second.failures
+            assert second.records[old_other.id] == old_other
+            assert metadata == ["one"]
+            assert len(queries) == 4
+            removed = True
+            third, _ = await DataportalSource().harvest(
+                client,
+                second.records,
+                tmp_path / "third",
+                cached_dump=raw,
+                previous_status=status,
+                changed_contexts={"one"},
+            )
+            own = next(
+                r
+                for r in third.records.values()
+                if r.root_uri == "https://example.org/Dataset"
+            )
+            assert not own.catalog_ids
+            assert third.records[old_other.id].catalog_ids == old_other.catalog_ids
+            assert not any(
+                r.native_id.startswith("catalog:one:") for r in third.records.values()
+            )
+
+    asyncio.run(run())

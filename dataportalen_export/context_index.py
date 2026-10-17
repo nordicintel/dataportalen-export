@@ -17,9 +17,12 @@ class ContextIndex:
         self.entries = defaultdict(set)
         self.catalogs = defaultdict(list)
         self.resource_ids = defaultdict(set)
+        self.retained_memberships = defaultdict(set)
         self.complete = False
 
-    async def load(self, client, batch, previous, *, force=False):
+    async def load(
+        self, client, batch, previous, *, force=False, changed_contexts=None
+    ):
         # Restore catalog identity when a metadata endpoint is temporarily unavailable.
         for record in previous.values():
             if record.source == "dataportal" and record.native_id.startswith(
@@ -37,9 +40,42 @@ class ContextIndex:
                             if "id" in value
                         }
                         self.catalogs[context].append((entity["id"], members))
-        catalog_rows = await client.solr(
-            "rdfType:http\\://www.w3.org/ns/dcat#Catalog AND public:true"
-        )
+        owners = {
+            identifier: context
+            for context, rows in self.catalogs.items()
+            for identifier, _ in rows
+        }
+        if changed_contexts is not None:
+            for record in previous.values():
+                if record.source != "dataportal":
+                    continue
+                if record.native_id.startswith("catalog:"):
+                    if record.native_id.split(":", 2)[1] not in changed_contexts:
+                        batch.records[record.id] = record
+                        batch.seen.add(record.id)
+                        batch.reused += 1
+                else:
+                    self.retained_memberships[record.root_uri].update(
+                        identifier
+                        for identifier in record.catalog_ids
+                        if owners.get(identifier) not in changed_contexts
+                    )
+
+        async def rows_for(kind):
+            query = f"rdfType:http\\://www.w3.org/ns/dcat#{kind} AND public:true"
+            if changed_contexts is None:
+                return await client.solr(query)
+            contexts = sorted(changed_contexts)
+            rows = []
+            for start in range(0, len(contexts), 30):
+                selected = " OR ".join(
+                    f'context:"{STORE}/{context}"'
+                    for context in contexts[start : start + 30]
+                )
+                rows.extend(await client.solr(f"{query} AND ({selected})"))
+            return rows
+
+        catalog_rows = await rows_for("Catalog")
         fresh_catalogs = defaultdict(list)
         failed_contexts = set()
 
@@ -116,11 +152,23 @@ class ContextIndex:
             fresh_catalogs[context].extend(
                 row for row in self.catalogs[context] if row[0] not in fresh_ids
             )
+        for context in list(self.catalogs):
+            if changed_contexts is None or context in changed_contexts:
+                del self.catalogs[context]
         self.catalogs.update(fresh_catalogs)
+        active_ids = {
+            identifier for rows in self.catalogs.values() for identifier, _ in rows
+        }
+        self.resource_ids = defaultdict(
+            set,
+            {
+                uri: ids & active_ids
+                for uri, ids in self.resource_ids.items()
+                if ids & active_ids
+            },
+        )
         for kind in ("Dataset", "DatasetSeries", "DataService"):
-            rows = await client.solr(
-                f"rdfType:http\\://www.w3.org/ns/dcat#{kind} AND public:true"
-            )
+            rows = await rows_for(kind)
             for child in rows:
                 context = str(child.get("contextId", ""))
                 for props in (child.get("info") or {}).values():
@@ -135,7 +183,7 @@ class ContextIndex:
             parts = uri[len(prefix) :].split("/")
             if len(parts) == 3 and parts[1] == "resource":
                 contexts.add(parts[0])
-        result = set()
+        result = set(self.retained_memberships.get(uri, ()))
         for context in contexts:
             catalogs = self.catalogs.get(context, [])
             for identifier, members in catalogs:

@@ -7,7 +7,15 @@ from dataportalen_export.schema import populate
 
 
 class DuckdbExporter:
-    def write(self, path, tables, *, parquet_directory=None, memory_limit_mb=512):
+    def write(
+        self,
+        path,
+        tables,
+        *,
+        parquet_directory=None,
+        parquet_tables=None,
+        memory_limit_mb=512,
+    ):
         with (
             tempfile.TemporaryDirectory(prefix="duckdb-import-") as temporary,
             duckdb.connect(
@@ -24,6 +32,8 @@ class DuckdbExporter:
             if parquet_directory:
                 parquet_directory.mkdir(parents=True, exist_ok=True)
                 for table in tables:
+                    if parquet_tables is not None and table not in parquet_tables:
+                        continue
                     target = str(parquet_directory / f"{table}.parquet").replace(
                         "'", "''"
                     )

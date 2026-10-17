@@ -49,7 +49,10 @@ To open a compressed database, first unpack it (use the same pattern for DuckDB)
 import lzma
 import shutil
 
-with lzma.open("data/catalog.db.xz", "rb") as source, open("catalog.db", "wb") as target:
+with (
+    lzma.open("data/catalog.db.xz", "rb") as source,
+    open("catalog.db", "wb") as target,
+):
     shutil.copyfileobj(source, target)
 ```
 
@@ -187,20 +190,38 @@ source compatibility issues, then dispatch Harvest manually. Use `force` when
 intentionally rebuilding retained source projections after a schema change.
 Do not delete retained state to resolve a transient failure.
 
-Dataportal dump requests use retained HTTP `ETag` and `Last-Modified` validators;
-an unchanged response downloads no dump body and reuses the accepted records.
-Catalog metadata uses EntryScape's entry modification timestamp, EU catalogs use
-their modification timestamp, and EU datasets use the API's catalog-record
-modification timestamp. Missing signals cause a
-fetch, and `--force` bypasses these checks. Validators are stored in the current
-manifest alongside the retained source records, without another cache database.
+Dataportal's [documented public catalog API](https://docs.dataportal.se/registry/api/)
+and data.europa.eu are the two metadata sources. EntryStore/EntryScape is the
+software behind Dataportal's public API.
+
+Before opening saved source records, the command checks the national dump's HTTP
+validators, Dataportal counts grouped by context and entries modified since the
+previous check, and compact EU ID/modification listings reconciled with repository
+IDs. A five-minute inclusive overlap tolerates indexing delays and equal timestamps.
+Counts detect additions, removals and disappeared contexts. Missing or incomplete
+signals fall back to retrieval. Checkpoints live in the current manifest.
+
+If those checks show no changes, the command updates only the manifest's check
+time and run counters. It skips loading/decompressing source state, constructing
+a candidate directory, serializing/compressing exports, and reopening previously
+validated products. It checks that published files still exist with their recorded
+sizes. Use `--validate` for a deliberate full checksum and consumer-read check.
+
+When a context changes, membership queries target that context. Other national
+contexts and unchanged EU catalogs retain their accepted records. Catalog metadata
+uses its entry modification timestamp, EU catalogs use their modification timestamp,
+and EU datasets use their catalog-record modification timestamp. `--force` bypasses
+reuse. The first run after adding checkpoints needs one complete baseline listing;
+subsequent checks use the compact grouped queries.
 
 Unchanged catalog JSONL and JSON-LD files are reused using content fingerprints.
 Only affected catalog files are regenerated; changes to shared metadata also
 invalidate the catalogs that use it. The combined files are checked separately.
-The compressed source archive and shared SQLite, DuckDB, and Parquet products are
-reused when their accepted state is unchanged; changed shared databases are
-rebuilt and compressed as whole files.
+Unchanged Parquet tables are reused individually. Retained products keep their
+previous checksums and validation results; only new or changed files are validated
+during publication. The compressed source archive and shared SQLite and DuckDB
+products are reused when their accepted state is unchanged; changed shared
+databases are rebuilt and compressed as whole files.
 
 If export generation fails in Actions, the `failed-harvest-state` artifact retains
 the source state, original dump, and compressed database candidates for one day.
