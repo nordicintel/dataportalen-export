@@ -93,7 +93,6 @@ async def check_sources(client, config, previous):
             ValueError,
             KeyError,
             TypeError,
-            StopIteration,
         ) as error:
             check.failures["dataportal"] = str(error)[:400]
             log.warning(

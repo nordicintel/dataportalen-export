@@ -10,7 +10,7 @@ from rdflib import BNode, Dataset, Graph
 from rdflib.compare import isomorphic
 
 from dataportalen_export.config import Config
-from dataportalen_export.current_state import CurrentState, make_record
+from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
 from dataportalen_export.exports.jsonld_exporter import JsonldExporter
 from dataportalen_export.exports.products import validate_products, write_products
 
@@ -98,6 +98,26 @@ def test_export_failure_preserves_previous_directory(tmp_path, monkeypatch):
         write_products(state, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (config.output.directory / "manifest.json").read_bytes() == before
     assert list(tmp_path.glob(".export-*/data"))
+
+
+def test_complete_source_failure_is_visible_with_usable_other_source_products(tmp_path):
+    state, _ = fixture_state()
+    config = Config()
+    config.output.directory = tmp_path / "data"
+    manifest = write_products(
+        state,
+        config,
+        [
+            SourceBatch(
+                "dataportal", records=state.records, successful_scopes={"dataportal"}
+            ),
+            SourceBatch("dataeu", failures={"dataeu": "source unavailable"}),
+        ],
+        attempted_at="2026-10-17T07:00:00+00:00",
+    )
+    assert manifest["status"] == "source_failure"
+    assert manifest["entity_counts"]["datasets"] == 1
+    validate_products(config.output.directory)
 
 
 def test_xz_products_are_readable_and_reusable(tmp_path):

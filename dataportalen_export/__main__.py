@@ -61,6 +61,12 @@ def main():
                 + json.dumps(summary, indent=2)
                 + "\n```\n"
             )
+    if not args.validate:
+        if output_file := os.environ.get("GITHUB_OUTPUT"):
+            with open(output_file, "a", encoding="utf-8") as stream:
+                stream.write("publishable=true\n")
+        if manifest["status"] == "source_failure":
+            raise SystemExit(1)
 
 
 if __name__ == "__main__":

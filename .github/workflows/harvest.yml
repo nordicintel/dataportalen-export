@@ -81,7 +81,7 @@ jobs:
             /usr/bin/time -v uv run --no-dev python -m dataportalen_export
           fi
       - name: Retain failed source state for diagnosis
-        if: failure() && steps.harvest.outcome == 'failure'
+        if: failure() && steps.harvest.outcome == 'failure' && steps.harvest.outputs.publishable != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: failed-harvest-state
@@ -97,6 +97,7 @@ jobs:
         if: always() && steps.schedule.outputs.due == 'true'
         env:
           HARVEST_OUTCOME: ${{ steps.harvest.outcome }}
+          PUBLISHABLE: ${{ steps.harvest.outputs.publishable }}
         run: |
           python - <<'PY'
           import json, os
@@ -110,7 +111,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .github/last_attempt.json
-          if [ "$HARVEST_OUTCOME" = 'success' ]; then
+          if [ "$HARVEST_OUTCOME" = 'success' ] || [ "$PUBLISHABLE" = 'true' ]; then
             git add data/
           fi
           if git diff --cached --quiet; then exit 0; fi

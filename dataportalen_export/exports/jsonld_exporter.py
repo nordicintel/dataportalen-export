@@ -23,11 +23,31 @@ class JsonldExporter:
         for table, left, right in links:
             if table in {"catalog_datasets", "catalog_series", "catalog_services"}:
                 memberships[right].add(left)
+        # Include source variants that supply referenced descriptions separately
+        # from a dataset's own RDF (including a retained last-known publisher).
+        dependencies = defaultdict(
+            set, {key: set(value) for key, value in memberships.items()}
+        )
+        changed = bool(state.referenced_records)
+        while changed:
+            changed = False
+            for table, left, right in links:
+                if table.startswith("catalog_"):
+                    continue
+                owner, target = (
+                    (right, left) if table == "series_datasets" else (left, right)
+                )
+                before = len(dependencies[target])
+                dependencies[target].update(dependencies[owner])
+                changed |= len(dependencies[target]) != before
         by_catalog = defaultdict(set)
         for kind, identifier, record in provenance:
             if kind == "catalogs":
                 by_catalog[identifier].add(record)
-            for catalog in memberships.get(identifier, ()):
+            owner_catalogs = (
+                dependencies if record in state.referenced_records else memberships
+            )
+            for catalog in owner_catalogs.get(identifier, ()):
                 by_catalog[catalog].add(record)
         # Source-qualified named graphs retain conflicting variants independently.
         for catalog in sorted(entities["catalogs"]):

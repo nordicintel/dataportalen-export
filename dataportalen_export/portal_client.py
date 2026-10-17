@@ -177,7 +177,9 @@ class PortalClient:
                 },
             )
         ).json()
-        facet = next(f for f in result["facetFields"] if f["name"] == "context")
+        facet = next((f for f in result["facetFields"] if f["name"] == "context"), None)
+        if facet is None:
+            raise ValueError("Dataportal response lacks context counts")
         counts = {
             v["name"].rstrip("/").rsplit("/", 1)[-1]: int(v["count"])
             for v in facet["values"]

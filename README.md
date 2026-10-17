@@ -177,12 +177,18 @@ Transient HTTP failures receive bounded retries. A failed existing record keeps
 its last good version and successful-fetch timestamp; a new unusable record is
 reported and skipped. Incomplete listings suppress deletion in their scope.
 Confirmed disappearance removes only the affected source membership/variant.
+Last-known descriptions still needed by surviving records remain stale with their
+original source RDF and fetch time. The manifest's `referenced_records` identifies
+those descriptions; they do not re-enter discovery. Unneeded descriptions are removed.
 One unavailable source does not block successful independent sources.
 
 Expected isolated failures appear as warnings and stale/skipped counts. Broken
-configuration, no successfully refreshed source, unusable first-run data,
+configuration, a completely unavailable source, unusable first-run data,
 integrity errors, oversized required exports, or a failed push are visible
-workflow failures. Candidate files are checked before replacing current outputs.
+workflow failures. When one source is unavailable, validated products from the other
+source can still publish alongside retained stale records, with `source_failure`
+in the manifest and a failed workflow result. If all sources fail, products stay
+unchanged. Candidate files are checked before replacing current outputs.
 The complete accepted set is published in one commit, never with a force-push.
 
 Inspect the Actions summary and manifest on failure. Correct configuration or

@@ -38,9 +38,10 @@ class Harvester:
             ) == SCHEMA_VERSION and previous_manifest.get(
                 "configuration_signature"
             ) == configuration_signature(config)
-            healthy = previous_manifest.get(
-                "status"
-            ) == "success" and not previous_manifest.get("failures")
+            healthy = previous_manifest.get("status") in {
+                "success",
+                "warnings",
+            } and not previous_manifest.get("failures")
             if (
                 not force
                 and compatible
@@ -96,7 +97,7 @@ class Harvester:
                     else:
                         batch, raw = await DataportalSource().harvest(
                             client,
-                            state.records,
+                            state.discovery_records,
                             Path(temporary),
                             force=force,
                             cached_dump=config.output.directory
@@ -111,7 +112,7 @@ class Harvester:
                 if config.sources.dataeu:
                     batch = await DataEuSource().harvest(
                         client,
-                        state.records,
+                        state.discovery_records,
                         config.sources,
                         force=force,
                         check=check if not force else None,
@@ -146,7 +147,9 @@ class Harvester:
 
 def retained_batch(source, state, status):
     records = {
-        key: record for key, record in state.records.items() if record.source == source
+        key: record
+        for key, record in state.discovery_records.items()
+        if record.source == source
     }
     return SourceBatch(
         source,

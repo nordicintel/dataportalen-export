@@ -127,6 +127,8 @@ def write_products(
             previous_manifest.get("schema_version") == SCHEMA_VERSION
             and settings_match
             and previous_state_digest == state_digest
+            and previous_manifest.get("referenced_records", {})
+            == state.referenced_records
         )
 
         product_digests = {}
@@ -246,7 +248,11 @@ def write_products(
             "configuration_signature": configuration_signature(config),
             "checkpoints": checkpoints or {},
             "no_changes": False,
-            "status": "warnings" if failures or omissions else "success",
+            "status": "source_failure"
+            if any(not batch.successful_scopes for batch in batches)
+            else "warnings"
+            if failures or omissions
+            else "success",
             "sources": outcomes,
             "content_digest": content_digest,
             "state_digest": state_digest,
@@ -255,6 +261,7 @@ def write_products(
             "entity_counts": {kind: len(rows) for kind, rows in entities.items()},
             "table_counts": {table: len(spec[2]) for table, spec in tables.items()},
             "record_count": len(state.records),
+            "referenced_records": state.referenced_records,
             "stale_records": sum(r.stale for r in state.records.values()),
             "datasets_without_catalog": len(
                 set(entities["datasets"])
