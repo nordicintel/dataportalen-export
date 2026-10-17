@@ -19,7 +19,7 @@ class ContextIndex:
         self.resource_ids = defaultdict(set)
         self.complete = False
 
-    async def load(self, client, batch, previous):
+    async def load(self, client, batch, previous, *, force=False):
         # Restore catalog identity when a metadata endpoint is temporarily unavailable.
         for record in previous.values():
             if record.source == "dataportal" and record.native_id.startswith(
@@ -48,6 +48,24 @@ class ContextIndex:
             native = f"catalog:{context}:{entry}"
             record_id = stable_id("source", f"dataportal:{native}")
             batch.seen.add(record_id)
+            old = previous.get(record_id)
+            stamp = next(
+                (
+                    value["value"]
+                    for properties in (child.get("info") or {}).values()
+                    for value in properties.get("http://purl.org/dc/terms/modified", [])
+                    if value.get("value")
+                ),
+                "",
+            )
+            if old and stamp and old.stamp == stamp and not force:
+                batch.records[record_id] = old
+                batch.reused += 1
+                old_ids = {e["id"] for e in old.entities if e["kind"] == "catalogs"}
+                fresh_catalogs[context].extend(
+                    row for row in self.catalogs[context] if row[0] in old_ids
+                )
+                return
             try:
                 response = await client.get(
                     f"{STORE}/{context}/metadata/{entry}",
@@ -70,17 +88,17 @@ class ContextIndex:
                     native_id=native,
                     scope="dataportal",
                     root_uri=str(nodes[0]),
-                    stamp="",
+                    stamp=stamp,
                     catalog_id_overrides=ids,
                 )
                 for entity in record.entities:
                     if entity["kind"] == "catalogs":
                         entity["context_ids"] = [context]
-                old = previous.get(record_id)
                 if old and old.digest == record.digest:
                     record.fetched_at = old.fetched_at
                     record.rdf = old.rdf
                 batch.records[record_id] = record
+                batch.fetched += 1
                 for node in nodes:
                     fresh_catalogs[context].append(
                         (

@@ -88,12 +88,26 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             and previous_manifest.get("content_digest") == content_digest
         )
 
-        def reuse(name):
-            if reusable:
+        product_digests = {}
+        reused_files = 0
+
+        def reuse(name, digest=None):
+            nonlocal reused_files
+            if digest is not None:
+                product_digests[name] = digest
+            matches = (
+                digest is not None
+                and previous_manifest.get("schema_version") == SCHEMA_VERSION
+                and previous_manifest.get("product_digests", {}).get(name) == digest
+            )
+            if reusable or matches:
                 for suffix in ("", ".gz", ".xz"):
                     old = output / (name + suffix)
                     if old.exists():
-                        shutil.copyfile(old, candidate / old.name)
+                        target = candidate / (name + suffix)
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(old, target)
+                        reused_files += 1
                         return True
             return False
 
@@ -106,6 +120,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         )
         if parquet_reused:
             shutil.copytree(output / "parquet", candidate / "parquet")
+            reused_files += len(list((candidate / "parquet").glob("*.parquet")))
         if (config.output.duckdb and not duck_reused) or (
             config.output.parquet and not parquet_reused
         ):
@@ -120,11 +135,13 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                 else None,
                 memory_limit_mb=config.output.duckdb_memory_limit_mb,
             )
-        JsonlExporter().write(candidate, entities, links, provenance, config.output)
+        JsonlExporter().write(
+            candidate, entities, links, provenance, config.output, reuse=reuse
+        )
         if config.output.jsonld:
             log.info("Writing JSON-LD")
             JsonldExporter().write(
-                candidate / "jsonld", state, entities, links, provenance
+                candidate / "jsonld", state, entities, links, provenance, reuse=reuse
             )
         previous_raw = output / "raw/dataportal.rdf.gz"
         raw_dump = raw_dump or (previous_raw if previous_raw.exists() else None)
@@ -132,6 +149,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             (candidate / "raw").mkdir()
             shutil.copyfile(raw_dump, candidate / "raw/dataportal.rdf.gz")
         omissions = []
+        log.info("Reused %d unchanged product files", reused_files)
         for path in sorted(candidate.rglob("*")):
             if not path.is_file():
                 continue
@@ -167,6 +185,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         outcomes = [
             {
                 "source": batch.source,
+                "http": batch.http,
                 "successful_scopes": sorted(batch.successful_scopes),
                 "complete_scopes": sorted(batch.complete_scopes),
                 "enumerated_records": len(batch.seen),
@@ -183,6 +202,8 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
             "status": "warnings" if failures or omissions else "success",
             "sources": outcomes,
             "content_digest": content_digest,
+            "product_digests": product_digests,
+            "reused_files": reused_files,
             "entity_counts": {kind: len(rows) for kind, rows in entities.items()},
             "table_counts": {table: len(spec[2]) for table, spec in tables.items()},
             "record_count": len(state.records),

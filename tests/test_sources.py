@@ -170,3 +170,100 @@ def test_scroll_cursor_can_remain_the_same_between_pages():
             assert await client.eu_listing("test") == {"a": "", "b": ""}
 
     asyncio.run(run())
+
+
+def test_dataportal_skips_unchanged_dump_and_catalog_downloads(tmp_path):
+    graph = Graph().parse(
+        Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
+    )
+    dump = graph.serialize(format="xml").encode()
+    version = "one"
+    downloaded = []
+
+    def respond(request):
+        if request.url.path == "/all.rdf":
+            if request.headers.get("If-None-Match") == '"dump-one"':
+                return httpx.Response(304)
+            downloaded.append("dump")
+            return httpx.Response(200, content=dump, headers={"ETag": '"dump-one"'})
+        if "/metadata/" in request.url.path:
+            downloaded.append("catalog")
+            return httpx.Response(
+                200,
+                text="""
+                @prefix dcat: <http://www.w3.org/ns/dcat#> .
+                <https://example.org/catalog> a dcat:Catalog;
+                    dcat:dataset <https://example.org/Dataset>, <https://example.org/series> .
+            """,
+            )
+        catalog = "#Catalog" in request.url.params["query"]
+        rows = (
+            [
+                {
+                    "contextId": "one",
+                    "entryId": "catalog",
+                    "info": {
+                        "entry": {
+                            "http://purl.org/dc/terms/modified": [{"value": version}],
+                        }
+                    },
+                }
+            ]
+            if catalog
+            else []
+        )
+        return httpx.Response(
+            200, json={"results": len(rows), "resource": {"children": rows}}
+        )
+
+    async def run():
+        nonlocal version
+        async with PortalClient(
+            Harvest(), transport=httpx.MockTransport(respond)
+        ) as client:
+            first, raw = await DataportalSource().harvest(
+                client, {}, tmp_path / "first"
+            )
+            status = {
+                "http": first.http,
+                "complete_scopes": ["dataportal"],
+                "failure_count": 0,
+            }
+            second, _ = await DataportalSource().harvest(
+                client,
+                first.records,
+                tmp_path / "second",
+                cached_dump=raw,
+                previous_status=status,
+            )
+            assert downloaded == ["dump", "catalog"]
+            assert second.records == first.records
+            assert second.reused == len(first.records)
+            version = "two"
+            changed, _ = await DataportalSource().harvest(
+                client,
+                second.records,
+                tmp_path / "third",
+                cached_dump=raw,
+                previous_status=status,
+            )
+            assert downloaded == ["dump", "catalog", "catalog"]
+            assert (
+                next(
+                    r
+                    for r in changed.records.values()
+                    if r.native_id.startswith("catalog:")
+                ).stamp
+                == "two"
+            )
+            await DataportalSource().harvest(
+                client,
+                changed.records,
+                tmp_path / "forced",
+                cached_dump=raw,
+                previous_status=status,
+                force=True,
+            )
+            assert downloaded[-2:] == ["dump", "catalog"]
+
+    asyncio.run(run())

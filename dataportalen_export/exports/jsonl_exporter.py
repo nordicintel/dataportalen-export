@@ -1,6 +1,14 @@
+import hashlib
 from collections import defaultdict
 
 from dataportalen_export.schema import json_text
+
+
+def rows_digest(rows):
+    digest = hashlib.sha256()
+    for row in rows:
+        digest.update((json_text(row) + "\n").encode())
+    return digest.hexdigest()
 
 
 def write_jsonl(path, rows):
@@ -11,7 +19,13 @@ def write_jsonl(path, rows):
 
 
 class JsonlExporter:
-    def write(self, directory, entities, links, provenance, settings):
+    def write(self, directory, entities, links, provenance, settings, *, reuse=None):
+        def emit(name, items):
+            items = list(items)
+            if reuse and reuse(name, rows_digest(items)):
+                return
+            write_jsonl(directory / name, items)
+
         memberships, distributions, sources = (
             defaultdict(list),
             defaultdict(list),
@@ -33,12 +47,12 @@ class JsonlExporter:
                 "source_record_ids": sorted(sources[("datasets", identifier)]),
             }
         if settings.combined_jsonl:
-            write_jsonl(directory / "datasets.jsonl", rows.values())
+            emit("datasets.jsonl", rows.values())
         if settings.entity_jsonl:
             for kind, items in entities.items():
                 if kind != "datasets":
-                    write_jsonl(
-                        directory / f"{kind}.jsonl",
+                    emit(
+                        f"{kind}.jsonl",
                         (
                             {**entity, "source_record_ids": sources[(kind, identifier)]}
                             for identifier, entity in sorted(items.items())
@@ -50,7 +64,7 @@ class JsonlExporter:
                 for catalog in catalogs:
                     by_catalog[catalog].append(rows[identifier])
             for catalog in entities["catalogs"]:
-                write_jsonl(
-                    directory / "catalogs" / catalog / "datasets.jsonl",
+                emit(
+                    f"catalogs/{catalog}/datasets.jsonl",
                     by_catalog[catalog],
                 )

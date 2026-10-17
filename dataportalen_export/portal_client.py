@@ -88,14 +88,28 @@ class PortalClient:
                 await asyncio.sleep(max(0, min(delay, 60)))
         raise RuntimeError("Unreachable retry state")
 
-    async def download(self, url: str, target: Path):
+    async def download(self, url: str, target: Path, *, validators=None):
         target.parent.mkdir(parents=True, exist_ok=True)
+        validators = validators or {}
+        headers = {
+            header: validators[key]
+            for key, header in (
+                ("etag", "If-None-Match"),
+                ("last-modified", "If-Modified-Since"),
+            )
+            if validators.get(key)
+        }
         for attempt in range(self.settings.max_attempts):
             try:
                 async with self.semaphore:
                     async with self.client.stream(
-                        "GET", url, timeout=self.settings.download_timeout_seconds
+                        "GET",
+                        url,
+                        headers=headers,
+                        timeout=self.settings.download_timeout_seconds,
                     ) as response:
+                        if response.status_code == 304 and headers:
+                            return None
                         response.raise_for_status()
                         if response.status_code != 200:
                             raise ValueError("Partial dump response")

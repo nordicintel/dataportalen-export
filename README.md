@@ -177,6 +177,19 @@ source compatibility issues, then dispatch Harvest manually. Use `force` when
 intentionally rebuilding retained source projections after a schema change.
 Do not delete retained state to resolve a transient failure.
 
+Dataportal dump requests use retained HTTP `ETag` and `Last-Modified` validators;
+an unchanged response downloads no dump body and reuses the accepted records.
+Catalog metadata uses EntryScape's entry modification timestamp, and EU datasets
+use the API's catalog-record modification timestamp. Missing signals cause a
+fetch, and `--force` bypasses these checks. Validators are stored in the current
+manifest alongside the retained source records, without another cache database.
+
+Unchanged catalog JSONL and JSON-LD files are reused using content fingerprints.
+Only affected catalog files are regenerated; changes to shared metadata also
+invalidate the catalogs that use it. The combined files are checked separately.
+Shared SQLite, DuckDB, and Parquet products are reused when their accepted state
+is unchanged; changed shared databases are rebuilt and compressed as whole files.
+
 If export generation fails in Actions, the `failed-harvest-state` artifact retains
 the source state, original dump, and compressed database candidates for one day.
 These diagnostics are not published under `data/`; they let an export fix reuse

@@ -1,5 +1,6 @@
 import json
 import lzma
+import os
 import sqlite3
 from pathlib import Path
 
@@ -141,3 +142,60 @@ def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):
     ]
     assert len(blank_sets) == 2
     assert not blank_sets[0] & blank_sets[1]
+
+
+def test_only_changed_catalog_products_are_rebuilt(tmp_path):
+    state, graph = fixture_state()
+    other_graph = Graph().parse(
+        data=graph.serialize(format="turtle").replace(
+            "https://example.org/", "https://other.example.org/"
+        ),
+        format="turtle",
+    )
+    other = make_record(
+        other_graph,
+        source="dataportal",
+        native_id="other",
+        scope="dataportal",
+        root_uri="https://other.example.org/Dataset",
+        stamp="one",
+    )
+    state.records[other.id] = other
+    config = Config()
+    config.output.directory = tmp_path / "data"
+    write_products(state, config, [], attempted_at="first")
+    other_catalog = next(e["id"] for e in other.entities if e["kind"] == "catalogs")
+    unchanged_paths = [
+        config.output.directory / "catalogs" / other_catalog / "datasets.jsonl",
+        config.output.directory / "jsonld" / f"{other_catalog}.jsonld",
+    ]
+    before = {path: path.read_bytes() for path in unchanged_paths}
+    for path in unchanged_paths:
+        os.utime(path, (1000000000, 1000000000))
+    # One dataset changes; the independent catalog's published files must be reused.
+    from rdflib import Literal, URIRef
+    from rdflib.namespace import DCTERMS
+
+    graph.set(
+        (URIRef("https://example.org/Dataset"), DCTERMS.title, Literal("Changed"))
+    )
+    changed = make_record(
+        graph,
+        source="dataportal",
+        native_id="fixture",
+        scope="dataportal",
+        root_uri="https://example.org/Dataset",
+        stamp="two",
+    )
+    state.records[changed.id] = changed
+    write_products(state, config, [], attempted_at="second")
+    for path in unchanged_paths:
+        assert path.read_bytes() == before[path]
+        assert path.stat().st_mtime == 1000000000
+    rows = [
+        json.loads(line)
+        for line in (config.output.directory / "datasets.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    assert any(row["title"] == {"und": ["Changed"]} for row in rows)

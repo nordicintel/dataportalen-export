@@ -1,3 +1,4 @@
+import json
 import logging
 import tempfile
 from pathlib import Path
@@ -15,13 +16,29 @@ class Harvester:
     async def run(self, config, *, force=False):
         attempted_at = now_iso()
         state = CurrentState.load(config.output.directory)
+        manifest_path = config.output.directory / "manifest.json"
+        previous_manifest = (
+            json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
+        )
         batches = []
         with tempfile.TemporaryDirectory(prefix="dataportalen-harvest-") as temporary:
             raw = None
             async with PortalClient(config.harvest) as client:
                 if config.sources.dataportal:
                     batch, raw = await DataportalSource().harvest(
-                        client, state.records, Path(temporary), force=force
+                        client,
+                        state.records,
+                        Path(temporary),
+                        force=force,
+                        cached_dump=config.output.directory / "raw/dataportal.rdf.gz",
+                        previous_status=next(
+                            (
+                                s
+                                for s in previous_manifest.get("sources", [])
+                                if s["source"] == "dataportal"
+                            ),
+                            {},
+                        ),
                     )
                     state.apply(batch)
                     batches.append(batch)

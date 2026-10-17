@@ -29,6 +29,7 @@ def now_iso():
 @dataclass
 class SourceBatch:
     source: str
+    http: dict[str, str] = field(default_factory=dict)
     records: dict[str, SourceRecord] = field(default_factory=dict)
     complete_scopes: set[str] = field(default_factory=set)
     seen: set[str] = field(default_factory=set)

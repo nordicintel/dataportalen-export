@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from rdflib import BNode, Graph
 
+from dataportalen_export.exports.jsonl_exporter import rows_digest
 from dataportalen_export.rdf_converter import parse_rdf
 from dataportalen_export.rdf_graph import canonical_graph
 from dataportalen_export.schema import json_text
@@ -16,7 +17,7 @@ CONTEXT = {
 
 
 class JsonldExporter:
-    def write(self, directory, state, entities, links, provenance):
+    def write(self, directory, state, entities, links, provenance, *, reuse=None):
         directory.mkdir(parents=True, exist_ok=True)
         memberships = defaultdict(set)
         for table, left, right in links:
@@ -30,6 +31,14 @@ class JsonldExporter:
                 by_catalog[catalog].add(record)
         # Source-qualified named graphs retain conflicting variants independently.
         for catalog in sorted(entities["catalogs"]):
+            if reuse and reuse(
+                f"jsonld/{catalog}.jsonld",
+                rows_digest(
+                    (record_id, state.records[record_id].digest)
+                    for record_id in sorted(by_catalog[catalog])
+                ),
+            ):
+                continue
             graphs = []
             for record_id in sorted(by_catalog[catalog]):
                 canonical = canonical_graph(parse_rdf(state.records[record_id].rdf))
