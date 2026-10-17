@@ -38,7 +38,7 @@ All operational settings live in [`config.toml`](config.toml):
 | `schedule.time` | Local daily time, `HH:MM`; defaults to `06:00` |
 | `schedule.timezone` | IANA timezone; defaults to `Europe/Stockholm` |
 | `database.enabled` | Also rebuild SQLite during Harvest; defaults to true |
-| `hosts.enabled` | Write sorted unique URL hostnames to `data/hosts.txt` during Harvest; defaults to true |
+| `hosts.enabled` | Write sorted unique base domains to `data/hosts.txt` during Harvest; defaults to true |
 | `database.gzip_level` | SQLite gzip compression level; defaults to 6 |
 
 Catalog and country selections form a **union**. A dataset matching both is written
@@ -131,9 +131,11 @@ Tests use mocked external HTTP pages and real gzip and SQLite files.
 
 ## URL hosts
 
-`data/hosts.txt` contains one lowercase hostname per line, sorted and deduplicated.
+`data/hosts.txt` contains one lowercase base domain per line, sorted and deduplicated.
 Extraction scans every JSONL key and nested value, including URLs embedded in descriptions
-and HTML. Subdomains are retained; schemes, credentials, ports, paths, queries and
+and HTML. Subdomains (including `www`) are removed using the bundled Public Suffix
+List: `api.example.co.uk` becomes `example.co.uk`. IP addresses and hosts with
+unrecognized suffixes remain unchanged. Schemes, credentials, ports, paths, queries and
 fragments are removed. Email addresses and malformed URLs are ignored. No network
 requests or SQLite rebuild are needed: JSONL contains the complete database source.
 Set `[hosts] enabled = false` to skip extraction and keep the previous file unchanged.

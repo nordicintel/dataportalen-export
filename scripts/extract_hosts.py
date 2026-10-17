@@ -1,4 +1,4 @@
-"""Extract sorted unique URL hostnames from the complete gzip JSONL export."""
+"""Extract sorted unique base domains from the complete gzip JSONL export."""
 
 import gzip
 import json
@@ -6,6 +6,8 @@ import re
 import tomllib
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+
+import tldextract
 
 ROOT = Path(__file__).resolve().parents[1]
 URL = re.compile(
@@ -42,6 +44,8 @@ def extract_hosts(source: Path, target: Path) -> int:
                         host = unquote(host).lower().rstrip(".")
                         if re.fullmatch(r"[\w.:-]+", host):
                             hosts.add(host)
+    suffixes = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)
+    hosts = {suffixes(host).top_domain_under_public_suffix or host for host in hosts}
     temporary = target.with_suffix(".txt.tmp")
     try:
         temporary.write_text(
@@ -57,7 +61,7 @@ def main():
     config = tomllib.loads((ROOT / "config.toml").read_text(encoding="utf-8"))
     if config["hosts"]["enabled"]:
         count = extract_hosts(ROOT / "data/datasets.jsonl.gz", ROOT / "data/hosts.txt")
-        print(f"Wrote {count} unique URL hosts to data/hosts.txt")
+        print(f"Wrote {count} unique base domains to data/hosts.txt")
     else:
         print("Host extraction disabled; existing hosts.txt left unchanged.")
 

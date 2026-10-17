@@ -15,6 +15,10 @@ def test_hosts_include_nested_keys_and_embedded_urls(tmp_path):
             "ftp://files.example/archive",
             "https://files%2eexample/archive",
             "https://bad,host/path",
+            "https://www.ehalsomyndigheten.se/info",
+            "https://api.ehalsomyndigheten.se/",
+            "https://maps.example.co.uk/path",
+            "https://www.example.co.uk/",
             "//cdn.example/file",
             "mailto:person@example.org",
             "https://[broken",
@@ -23,13 +27,14 @@ def test_hosts_include_nested_keys_and_embedded_urls(tmp_path):
     }
     with gzip.open(source, "wt", encoding="utf-8") as stream:
         stream.write(json.dumps(record) + "\n")
-    assert extract_hosts(source, target) == 6
+    assert extract_hosts(source, target) == 7
     assert target.read_text().splitlines() == [
-        "api.example.org",
         "cdn.example",
+        "ehalsomyndigheten.se",
+        "example.co.uk",
+        "example.org",
         "files.example",
         "other.example",
-        "sub.example.org",
         "vocabulary.example",
     ]
 
