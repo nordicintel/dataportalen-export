@@ -58,20 +58,20 @@ Use the gist’s functions and straightforward control flow rather than rebuildi
 ### Source and record handling
 
 - Query `https://data.europa.eu/api/hub/search/search`.
-- Use `filter=dataset`, `scroll=true`, page size **500**, and the catalog facet **`oppnadata`**, matching the gist’s actual behavior.
+- Use `filter=dataset`, `scroll=true`, and configurable page size (default **500**). Catalog IDs default to **`oppnadata`**; configured country IDs are queried separately and unioned, deduplicating by API dataset ID.
 - Request complete records: **no `includes` projection**.
 - Follow `/scroll` until it returns no records.
 - Use an updated scroll ID when a response supplies one; otherwise continue with the existing ID.
-- Keep the recursive Swedish/English language-map filtering from the script.
+- Keep recursive language-map filtering with configurable retained languages (default Swedish/English); an empty language list keeps all languages.
 - Preserve everything else returned by the API, including nested distributions, data services, contacts, catalog information, and unfamiliar properties.
 - Do not apply the previous project’s source exclusions, field-removal lists, frequency thresholds, URI reconciliation, or publisher pruning.
 - Do not download underlying dataset files.
 
-Remove the unused country constant and correct the script’s documentation to describe the actual catalog scope.
+Replace unused source constants with the catalog/country selections in root `config.toml`; document union semantics.
 
 ### Requests
 
-- Keep `requests`, the **120-second timeout**, and **five attempts** with exponential backoff.
+- Keep `requests`; configure timeout (default **120 seconds**), total attempts (default **five**), retry backoff, and successful-page delay (default zero) in TOML.
 - Reuse one `requests.Session`.
 - Remove the unconditional half-second delay between successful pages. Backoff applies to failed requests.
 - Log page progress and the final number of records.
@@ -93,23 +93,20 @@ Write to one temporary gzip file and rename it to the final filename when the st
 
 ### Configuration
 
-Keep root configuration small:
+Root `config.toml` controls catalog IDs, country IDs, language keys, page size,
+request attempts, timeout, retry backoff, page delay, gzip level, logging level,
+automatic schedule enablement, interval in days, local time, IANA timezone,
+automatic database creation, and Zstandard level. Defaults are recorded in that file.
+An empty language list keeps all languages. Catalog/country selections form a union.
 
-```toml
-[scrape]
-catalogs = ["oppnadata"]
+`database.enabled` controls whether the daily harvest also builds SQLite. It does
+not disable the standalone database command or manual workflow. Output filenames
+remain fixed. Use ordinary dictionaries and standard-library TOML parsing.
 
-[database]
-enabled = false
-```
+## 3. Use the defined database schema in `database.schema.sql`
 
-`database.enabled` controls whether the daily harvest also builds SQLite. It does **not** disable the standalone database command or manual workflow.
-
-Fixed filenames and the gist’s request settings stay in the scripts. Avoid adding configuration for every implementation detail.
-
-## 3. Define the simplified database in `database.schema.sql`
-
-Use the pasted schema as the starting point. Keep its five principal tables:
+`database.schema.sql` has already been written and verified to execute in SQLite.
+Use it directly as the authoritative schema, with five principal tables:
 
 1. `catalogs`
 2. `publishers`
@@ -142,7 +139,13 @@ Examples:
 { "sv": false, "en": true }
 ```
 
-Use SQLite `TEXT` columns containing valid JSON. Preserve whichever language keys exist; do not invent translations or fill absent languages with empty strings.
+Declare every JSON-bearing column explicitly as `JSON`, not `TEXT`. The SQL file
+currently defines 34 such columns, including language maps, embedded collections,
+URL objects, and `record_json`. Serialize values as valid JSON when inserting them.
+Preserve whichever language keys exist; do not invent translations or fill absent
+languages with empty strings. Missing maps default to `{}` and missing collections
+to `[]`; distribution `urls` defaults to an object with empty `access`, `download`,
+and `service_endpoint` arrays.
 
 Apply the same convention inside embedded objects such as categories and landing pages.
 
@@ -204,10 +207,13 @@ Retain complete dataset records in `datasets.record_json`. This preserves API in
 - Do not merge publishers by name. If a publisher has no resource URI, preserve its details on the dataset record and leave the publisher reference null.
 - Give distribution rows a simple integer primary key and retain the API distribution identifier separately as `source_id`. This allows the same source distribution to occur under multiple datasets without a collision or custom hash.
 - Give data-service rows an integer primary key and reference their distribution row and dataset.
+- Store `spatial_resolution_m` as `REAL` to preserve fractional values.
 - Retain foreign keys and the useful indexes on catalog, publisher, parent dataset, distribution, and distribution format.
 - Remove indexes belonging to deleted supporting tables.
 
-The SQL file is the sole definition of tables and indexes. Do not duplicate DDL in Python or build a schema-generation system.
+The SQL file is the sole definition of tables and its six indexes. Do not duplicate
+DDL in Python or build a schema-generation system. Schema creation is already done;
+the remaining implementation must consume this file rather than redesign it.
 
 ## 4. Implement one standalone database builder
 
@@ -254,14 +260,14 @@ Malformed input or a database error fails the build and leaves the previous comp
 
 `harvest.yml` has:
 
-- One daily cron: **`0 5 * * *`**, meaning 05:00 UTC.
+- One daily cron: **`0 6 * * *`** with native **`timezone: Europe/Stockholm`**, generated from root configuration by `python scripts/scrape.py --sync-schedule`. Checks verify the workflow stays in sync. No hourly runs.
 - Manual dispatch.
 - Checkout, Python/uv setup, locked dependencies, scraper, optional database build, commit/push.
 - A single shared publication concurrency group with cancellation disabled.
 
 Remove the hourly schedule gate, timezone scheduling module, last-attempt file, source checkpoints, and no-change logic.
 
-Every scheduled run scrapes everything.
+On the daily trigger, use the configured day interval and latest commit touching the JSONL to decide whether to run. A due run scrapes everything. The schedule check is standard-library-only and installs no harvest dependencies when skipped. Manual dispatch bypasses the gate.
 
 After a successful scrape, read `database.enabled` using standard-library TOML parsing:
 
@@ -315,6 +321,7 @@ Verify:
 
 - Exactly five tables exist.
 - There are no `_sv`/`_en` columns or supporting collection tables.
+- All 34 JSON-bearing columns have declared type `JSON`, as exposed by SQLite table metadata.
 - Language maps and embedded collections survive SQL insertion.
 - Dataset, distribution, and service parent references work.
 - The `.db.zst` decompresses into a readable SQLite database.
@@ -328,7 +335,7 @@ Do not carry over the old test suite or test implementation-private helpers.
 After the fixture tests and Ruff pass:
 
 1. Run the new harvest once in GitHub Actions.
-2. Open the resulting gzip JSONL and confirm it contains complete records from the script’s scope.
+2. Open the resulting gzip JSONL and confirm it contains complete records from the configured scope.
 3. Run the manual database workflow with automatic database generation disabled, proving that it works independently.
 4. Decompress the database, query the five tables, and inspect multilingual and embedded JSON values.
 5. Record actual elapsed time, record counts, and compressed file sizes in the completion report.

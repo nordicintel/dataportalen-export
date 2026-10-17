@@ -1,36 +1,30 @@
 name: Harvest
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '0 6 * * *'
+      timezone: "Europe/Stockholm"
   workflow_dispatch:
-    inputs:
-      force:
-        description: Refetch unchanged records
-        type: boolean
-        default: false
 permissions:
   contents: write
 concurrency:
-  group: catalog-harvest
+  group: catalog-publication
   cancel-in-progress: false
 jobs:
   harvest:
     runs-on: ubuntu-24.04
-    timeout-minutes: 300
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
-      - name: Check daily schedule
+      - name: Check configured interval
         id: schedule
         env:
-          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            python -m dataportalen_export.schedule --manual
-          else
-            python -m dataportalen_export.schedule
+          last=''
+          if [ "$GITHUB_EVENT_NAME" = 'schedule' ]; then
+            last=$(gh api "repos/$GITHUB_REPOSITORY/commits?path=data/datasets.jsonl.gz&sha=$GITHUB_REF_NAME&per_page=1" --jq '.[0].commit.committer.date // ""')
           fi
+          python scripts/scrape.py --check-due --last-scrape "$last"
       - uses: astral-sh/setup-uv@v6
         if: steps.schedule.outputs.due == 'true'
         with:
@@ -38,42 +32,23 @@ jobs:
           enable-cache: true
       - if: steps.schedule.outputs.due == 'true'
         run: uv sync --locked --no-dev
-      - name: Harvest and validate products
-        id: harvest
+      - name: Scrape complete JSONL
+        id: scrape
         if: steps.schedule.outputs.due == 'true'
+        run: /usr/bin/time -v uv run --no-dev python scripts/scrape.py
+      - name: Rebuild optional database
+        id: database
+        if: steps.schedule.outputs.due == 'true' && steps.schedule.outputs.database == 'true'
+        run: /usr/bin/time -v uv run --no-dev python scripts/build_database.py
+      - name: Publish completed downloads
+        if: ${{ !cancelled() && steps.scrape.outcome == 'success' }}
         env:
-          FORCE_REFRESH: ${{ inputs.force }}
+          DATABASE_OUTCOME: ${{ steps.database.outcome }}
         run: |
-          if [ "$FORCE_REFRESH" = "true" ]; then
-            /usr/bin/time -v uv run --no-dev python -m dataportalen_export --force
-          else
-            /usr/bin/time -v uv run --no-dev python -m dataportalen_export
-          fi
-      - name: Record attempt and publish
-        if: always() && steps.schedule.outputs.due == 'true'
-        env:
-          HARVEST_OUTCOME: ${{ steps.harvest.outcome }}
-          PUBLISHABLE: ${{ steps.harvest.outputs.publishable }}
-          OUTPUT_DIRECTORY: ${{ steps.schedule.outputs.directory }}
-        run: |
-          python - <<'PY'
-          import json, os
-          from datetime import datetime, UTC
-          from pathlib import Path
-          Path('.github/last_attempt.json').write_text(json.dumps({
-              'attempted_at': datetime.now(UTC).isoformat(),
-              'outcome': os.environ['HARVEST_OUTCOME'],
-          }, separators=(',', ':')) + '\n')
-          PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/last_attempt.json
-          if [ "$HARVEST_OUTCOME" = 'success' ] || [ "$PUBLISHABLE" = 'true' ]; then
-            git add -- "$OUTPUT_DIRECTORY"
-          fi
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Refresh current catalog exports'
-          git push origin HEAD:main
-      - name: Verify the next scheduled check skips today
-        if: success() && steps.schedule.outputs.due == 'true'
-        run: test "$(python -m dataportalen_export.schedule)" = 'due=false'
+          git add data/datasets.jsonl.gz
+          if [ "$DATABASE_OUTCOME" = 'success' ]; then git add data/catalog.db.zst; fi
+          git diff --cached --quiet && exit 0
+          git commit -m 'Refresh dataset downloads'
+          git push origin "HEAD:$GITHUB_REF_NAME"

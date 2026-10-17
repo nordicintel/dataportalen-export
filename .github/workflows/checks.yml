@@ -1,9 +1,9 @@
 name: Checks
 on:
   push:
-    paths-ignore: ['data/**', '.github/last_attempt.json', '**.md']
+    paths-ignore: ['data/**', '**.md']
   pull_request:
-    paths-ignore: ['data/**', '.github/last_attempt.json', '**.md']
+    paths-ignore: ['data/**', '**.md']
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,4 +20,5 @@ jobs:
       - run: uv sync --locked
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: uv run python scripts/scrape.py --check-schedule
       - run: uv run pytest -q
