@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/56/resource/2","@type":"dcat:Catalog","dct:title":"Täby kommun"}],"@id":"urn:source:85e597a3828223970053e1e132d5fe5b5067bed5958e7e10baab970b5d261fe2"}]}

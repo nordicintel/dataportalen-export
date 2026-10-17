@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/151/resource/2","@type":"dcat:Catalog","dct:title":"Konstfack"}],"@id":"urn:source:28e6a10b1f6349eed0e6073e8358048f3ba5a5c960ef6aa8ef906ac59f22e7a8"}]}

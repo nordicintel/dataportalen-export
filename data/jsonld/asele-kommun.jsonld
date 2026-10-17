@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/440/resource/2","@type":"dcat:Catalog","dct:title":"Åsele kommun"}],"@id":"urn:source:696108be28f5ff0f736e0f8159f18c9a5f674c1d3fed9eb2420831c54581ca8d"}]}

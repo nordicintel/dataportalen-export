@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/273/resource/2","@type":"dcat:Catalog","dct:title":"Järfälla kommun"}],"@id":"urn:source:2788dd25e3a347c0b28e102f007d60269665cafb283a19b63f2080d8b7daea74"}]}

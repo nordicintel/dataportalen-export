@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/297/resource/2","@type":"dcat:Catalog","dct:title":"Bromölla kommun"}],"@id":"urn:source:ba71788b8f6585d434d8f062c9327c06e869551582fbfcb1f035ffa290dbe4e0"}]}

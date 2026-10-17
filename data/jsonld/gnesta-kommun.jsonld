@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/569/resource/2","@type":"dcat:Catalog","dct:title":"Gnesta kommun"}],"@id":"urn:source:9114df7c9bc1a1f95cb6296a51aa0ffb584e9e1f93377289e43072987b0a9e6a"}]}

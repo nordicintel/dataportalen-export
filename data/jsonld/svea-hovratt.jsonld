@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/58/resource/2","@type":"dcat:Catalog","dct:title":"Svea Hovrätt"}],"@id":"urn:source:cd9189997beac63a6a331f076e51bf0aa1e5739a84632d31bbe766d2d5f7aa79"}]}

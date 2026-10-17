@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/488/resource/2","@type":"dcat:Catalog","dct:title":"Sotenäs kommun"}],"@id":"urn:source:d39831b941a246d35c0396b815d283d1559f6c75d6d183c6698a69694ebde86a"}]}

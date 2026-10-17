@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/412/resource/2","@type":"dcat:Catalog","dct:title":"Hedemora kommun"}],"@id":"urn:source:3fe4959a79795f0e23ed0ab6e2bb1373d9e8df577722478c6dafff32d323c738"}]}

@@ -1,1 +1,0 @@
-{"@context":{"dcat":"http://www.w3.org/ns/dcat#","dct":"http://purl.org/dc/terms/","foaf":"http://xmlns.com/foaf/0.1/","xsd":"http://www.w3.org/2001/XMLSchema#"},"@graph":[{"@graph":[{"@id":"https://admin.dataportal.se/store/263/resource/1","@type":"dcat:Catalog","dct:title":"Malå kommun"}],"@id":"urn:source:221d71caaeab3a7356f4742a99641f6cd97e8aeeea2f1b11fd115d35ce027a1a"}]}
