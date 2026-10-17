@@ -50,7 +50,15 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
             db.execute("select count(*) from dataset_distributions").fetchone()[0] == 1
         )
         assert not db.execute("pragma foreign_key_check").fetchall()
+        expected_tables = {
+            name: sorted(db.execute(f'SELECT * FROM "{name}"').fetchall())
+            for (name,) in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
     with duckdb.connect(str(path / "catalog.duckdb"), read_only=True) as db:
+        for name, rows in expected_tables.items():
+            assert sorted(db.execute(f'SELECT * FROM "{name}"').fetchall()) == rows
         assert db.execute("select count(*) from datasets").fetchone()[0] == 1
         assert (
             db.execute(

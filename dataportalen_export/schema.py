@@ -147,17 +147,27 @@ def tables_for(state, entities, links, provenance):
     return tables
 
 
-def populate(connection, tables):
+def populate(connection, tables, *, bulk_directory=None):
     for table, (columns, constraints, rows) in tables.items():
         definition = ",".join(
             [f'"{name}" {kind}' for name, kind in columns] + constraints
         )
         connection.execute(f'CREATE TABLE "{table}" ({definition})')
         if rows:
-            placeholders = ",".join("?" for _ in columns)
-            connection.executemany(
-                f'INSERT INTO "{table}" VALUES ({placeholders})', rows
-            )
+            if bulk_directory is not None:
+                path = bulk_directory / "rows.jsonl"
+                names = [name for name, _ in columns]
+                with path.open("w", encoding="utf-8", newline="\n") as stream:
+                    for row in rows:
+                        stream.write(json_text(dict(zip(names, row))) + "\n")
+                source = path.as_posix().replace("'", "''")
+                connection.execute(f'''COPY "{table}" FROM '{source}' (FORMAT JSON)''')
+                path.unlink()
+            else:
+                placeholders = ",".join("?" for _ in columns)
+                connection.executemany(
+                    f'INSERT INTO "{table}" VALUES ({placeholders})', rows
+                )
     for table in MODELS:
         connection.execute(f'CREATE INDEX "{table}_uri" ON "{table}" (uri)')
     for table in LINKS:

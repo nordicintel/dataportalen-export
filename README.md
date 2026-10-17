@@ -26,7 +26,7 @@ actual filenames, sizes, checksums, counts, source outcomes, and freshness.
 
 Files above the configured size threshold use XZ compression by default;
 `output.compression` can select `xz` or `gzip`, and `compression_level` selects
-0–9 (default 6). Decompress a `.db.xz` or
+0–9 (default 9). Decompress a `.db.xz` or
 `.duckdb.xz` before opening it. Python's standard-library `lzma` reads XZ files;
 `gzip` reads the optional `.gz` alternative. Compression changes no database
 tables, indexes, relationships, or metadata. The manifest names the actual files.
@@ -57,8 +57,9 @@ uv run python -m dataportalen_export --validate
 
 Operational settings live in [`config.toml`](config.toml): active formats,
 source selection, concurrency, timeouts, retry attempts, logging levels,
-output path, compression method/threshold, and daily time/timezone. Paths resolve relative to
-the configuration file, independently of the current working directory.
+output path, DuckDB memory limit, compression method/level/threshold, and daily
+time/timezone. Paths resolve relative to the configuration file, independently
+of the current working directory.
 `--config` selects another TOML file for a deliberate separate run.
 
 Unattended execution uses **GitHub-hosted Actions only**. The Harvest workflow
@@ -177,10 +178,14 @@ intentionally rebuilding retained source projections after a schema change.
 Do not delete retained state to resolve a transient failure.
 
 If export generation fails in Actions, the `failed-harvest-state` artifact retains
-the source state, original dump, and any compressed SQLite candidate for one day.
+the source state, original dump, and compressed database candidates for one day.
 These diagnostics are not published under `data/`; they let an export fix reuse
 already retrieved metadata. Download the artifact from the failed run before it
 expires. Size-limit errors include the exact compressed byte count.
+Before the first publication, a manual dispatch can set `recovery_run_id` to that
+failed run. It restores only retained source state into an empty output directory,
+then checks both live sources and builds all products normally. Existing published
+products cannot be overwritten by this recovery input.
 
 ## Development checks
 

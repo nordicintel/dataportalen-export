@@ -8,8 +8,13 @@ on:
         description: Refetch unchanged records
         type: boolean
         default: false
+      recovery_run_id:
+        description: Optional failed run whose source state should seed the first publication
+        type: string
+        default: ''
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: catalog-harvest
   cancel-in-progress: false
@@ -38,6 +43,32 @@ jobs:
           enable-cache: true
       - if: steps.schedule.outputs.due == 'true'
         run: uv sync --locked --no-dev
+      - name: Restore source state before first publication
+        if: steps.schedule.outputs.due == 'true' && inputs.recovery_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_RUN_ID: ${{ inputs.recovery_run_id }}
+        run: |
+          gh run download "$RECOVERY_RUN_ID" --repo "$GITHUB_REPOSITORY" --name failed-harvest-state --dir "$RUNNER_TEMP/harvest-recovery"
+          python - <<'PY'
+          import json, os, shutil, tomllib
+          from pathlib import Path
+          config = tomllib.loads(Path('config.toml').read_text())
+          output = Path(config.get('output', {}).get('directory', 'data'))
+          if output.exists() and any(output.iterdir()):
+              raise RuntimeError('Recovery requires an empty output directory; published products are never overwritten')
+          recovery = Path(os.environ['RUNNER_TEMP']) / 'harvest-recovery'
+          states = [p for name in ('source_records.jsonl.xz', 'source_records.jsonl.gz') for p in recovery.rglob(name)]
+          if len(states) != 1:
+              raise RuntimeError('Expected exactly one retained source-state file')
+          output.mkdir(parents=True, exist_ok=True)
+          shutil.copyfile(states[0], output / states[0].name)
+          raw = list(recovery.rglob('dataportal.rdf.gz'))
+          if len(raw) == 1:
+              (output / 'raw').mkdir()
+              shutil.copyfile(raw[0], output / 'raw/dataportal.rdf.gz')
+          (output / 'manifest.json').write_text(json.dumps({'schema_version': 0, 'status': 'unpublished-recovery'}) + '\n')
+          PY
       - name: Harvest and validate products
         id: harvest
         if: steps.schedule.outputs.due == 'true'
@@ -58,6 +89,7 @@ jobs:
             .export-*/data/source_records.jsonl.*
             .export-*/data/raw/dataportal.rdf.gz
             .export-*/data/catalog.db.*
+            .export-*/data/catalog.duckdb.*
           include-hidden-files: true
           retention-days: 1
           compression-level: 0

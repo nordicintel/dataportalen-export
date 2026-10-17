@@ -67,10 +67,11 @@ class Output(Settings):
     catalog_jsonl: bool = True
     sqlite: bool = True
     duckdb: bool = True
+    duckdb_memory_limit_mb: int = Field(default=512, ge=128)
     parquet: bool = True
     jsonld: bool = True
     compression: Literal["xz", "gzip"] = "xz"
-    compression_level: int = Field(default=6, ge=0, le=9)
+    compression_level: int = Field(default=9, ge=0, le=9)
     compression_threshold_mib: float = Field(default=95, gt=0, le=95)
 
 

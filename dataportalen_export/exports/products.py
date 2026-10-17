@@ -118,6 +118,7 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                 parquet_directory=candidate / "parquet"
                 if config.output.parquet and not parquet_reused
                 else None,
+                memory_limit_mb=config.output.duckdb_memory_limit_mb,
             )
         JsonlExporter().write(candidate, entities, links, provenance, config.output)
         if config.output.jsonld:
