@@ -48,9 +48,10 @@ async def check_sources(client, config, previous):
 
     async def national():
         try:
-            headers, counts = await asyncio.gather(
+            headers, counts, description_counts = await asyncio.gather(
                 client.get(DUMP, method="HEAD", accept="*/*"),
                 client.context_counts(),
+                client.context_counts(descriptions=True),
             )
             validators = {
                 k: headers.headers[k]
@@ -65,12 +66,22 @@ async def check_sources(client, config, previous):
                     .isoformat()
                     .replace("+00:00", "Z")
                 )
-                modified = await client.context_counts(since=since)
-                check.changed_contexts = set(modified) | {
+                modified = await client.context_counts(since=since, descriptions=True)
+                relevant = counts.keys() | prior["counts"].keys()
+                dirty = set(modified) | {
                     context
-                    for context in counts.keys() | prior["counts"].keys()
+                    for context in relevant
                     if counts.get(context) != prior["counts"].get(context)
                 }
+                previous_descriptions = prior.get("description_counts")
+                if previous_descriptions is not None:
+                    dirty.update(
+                        context
+                        for context in description_counts.keys()
+                        | previous_descriptions.keys()
+                        if description_counts.get(context)
+                        != previous_descriptions.get(context)
+                    )
                 previous_http = prior["http"]
                 same_dump = bool(
                     validators.get("etag")
@@ -82,10 +93,19 @@ async def check_sources(client, config, previous):
                         and validators.get("content-length")
                         and validators == previous_http
                     )
+                # Changes to descriptions outside known catalogs may be shared
+                # dependencies. A changed dump then needs a conservative full check.
+                check.changed_contexts = (
+                    None
+                    if not same_dump
+                    and (dirty - relevant or previous_descriptions is None)
+                    else dirty & relevant
+                )
                 check.dataportal_unchanged = same_dump and not check.changed_contexts
             check.checkpoints["dataportal"] = {
                 "checked_at": started,
                 "counts": counts,
+                "description_counts": description_counts,
                 "http": validators,
             }
         except (

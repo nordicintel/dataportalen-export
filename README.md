@@ -201,7 +201,7 @@ and data.europa.eu are the two metadata sources. EntryStore/EntryScape is the
 software behind Dataportal's public API.
 
 Before opening saved source records, the command checks the national dump's HTTP
-validators, Dataportal counts grouped by context and entries modified since the
+validators, Dataportal counts grouped by context (including related descriptions) and entries modified since the
 previous check, and compact EU ID/modification listings reconciled with repository
 IDs. A five-minute inclusive overlap tolerates indexing delays and equal timestamps.
 Counts detect additions, removals and disappeared contexts. Missing or incomplete
@@ -219,6 +219,12 @@ uses its entry modification timestamp, EU catalogs use their modification timest
 and EU datasets use their catalog-record modification timestamp. `--force` bypasses
 reuse. The first run after adding checkpoints needs one complete baseline listing;
 subsequent checks use the compact grouped queries.
+
+A changed national dump is retained in full and parsed once. RDF extraction and
+comparison then target affected catalog roots, new or unresolved roots, and records
+that may reference changed shared descriptions. Independent catalog records reuse
+their accepted RDF and projections. Ambiguous dependency signals trigger a
+conservative comparison.
 
 Unchanged catalog JSONL and JSON-LD files are reused using content fingerprints.
 Only affected catalog files are regenerated; changes to shared metadata also

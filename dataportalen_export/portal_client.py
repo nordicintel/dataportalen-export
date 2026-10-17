@@ -156,13 +156,13 @@ class PortalClient:
             raise ValueError(f"Incomplete EntryScape listing: {len(rows)}/{total}")
         return rows
 
-    async def context_counts(self, *, since=None):
+    async def context_counts(self, *, since=None, descriptions=False):
         """Small grouped change check through Dataportal's documented catalog API."""
         kinds = " OR ".join(
             f"rdfType:http\\://www.w3.org/ns/dcat#{kind}"
             for kind in ("Catalog", "Dataset", "DatasetSeries", "DataService")
         )
-        query = f"public:true AND ({kinds})"
+        query = "public:true" if descriptions else f"public:true AND ({kinds})"
         if since:
             query += f" AND modified:[{since} TO *]"
         result = (

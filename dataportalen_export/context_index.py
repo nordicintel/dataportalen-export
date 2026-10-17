@@ -18,6 +18,8 @@ class ContextIndex:
         self.catalogs = defaultdict(list)
         self.resource_ids = defaultdict(set)
         self.retained_memberships = defaultdict(set)
+        self.affected_catalogs = set()
+        self.affected_uris = set()
         self.complete = False
 
     async def load(
@@ -45,6 +47,11 @@ class ContextIndex:
             for context, rows in self.catalogs.items()
             for identifier, _ in rows
         }
+        self.affected_catalogs.update(
+            identifier
+            for identifier, context in owners.items()
+            if changed_contexts is None or context in changed_contexts
+        )
         if changed_contexts is not None:
             for record in previous.values():
                 if record.source != "dataportal":
@@ -156,6 +163,11 @@ class ContextIndex:
             if changed_contexts is None or context in changed_contexts:
                 del self.catalogs[context]
         self.catalogs.update(fresh_catalogs)
+        for context, catalogs in self.catalogs.items():
+            if changed_contexts is None or context in changed_contexts:
+                for identifier, members in catalogs:
+                    self.affected_catalogs.add(identifier)
+                    self.affected_uris.update(members)
         active_ids = {
             identifier for rows in self.catalogs.values() for identifier, _ in rows
         }

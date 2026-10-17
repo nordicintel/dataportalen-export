@@ -14,6 +14,7 @@ def test_public_catalog_checks_select_changed_context_and_detect_deletion():
     config.sources.dataeu = False
     changed = False
     deleted = False
+    related_deleted = False
     requests = []
 
     def respond(request):
@@ -23,9 +24,14 @@ def test_public_catalog_checks_select_changed_context_and_detect_deletion():
         query = request.url.params["query"]
         counts = {"one": 2, "two": 2}
         if "modified:[" in query:
+            assert "rdfType:" not in query, (
+                "Related descriptions also have modification signals"
+            )
             counts = {"one": 1} if changed else {}
         elif deleted:
             counts.pop("two")
+        elif related_deleted and "rdfType:" not in query:
+            counts["one"] = 1
         return httpx.Response(
             200,
             json={
@@ -47,7 +53,7 @@ def test_public_catalog_checks_select_changed_context_and_detect_deletion():
         )
 
     async def run():
-        nonlocal changed, deleted
+        nonlocal changed, deleted, related_deleted
         async with PortalClient(
             config.harvest, transport=httpx.MockTransport(respond)
         ) as client:
@@ -62,6 +68,11 @@ def test_public_catalog_checks_select_changed_context_and_detect_deletion():
             assert not one.unchanged
             assert one.changed_contexts == {"one"}
             changed = False
+            related_deleted = True
+            related = await check_sources(client, config, manifest)
+            assert related.changed_contexts == {"one"}
+            assert not related.unchanged
+            related_deleted = False
             deleted = True
             removal = await check_sources(client, config, manifest)
             assert removal.changed_contexts == {"two"}

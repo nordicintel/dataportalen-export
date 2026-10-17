@@ -3,7 +3,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-from rdflib import Graph
+from rdflib import Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS, FOAF
 
 from dataportalen_export.config import Harvest, Sources
 from dataportalen_export.current_state import CurrentState
@@ -326,7 +327,7 @@ def test_eu_skips_unchanged_catalog_and_dataset_metadata():
     asyncio.run(run())
 
 
-def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path):
+def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path, monkeypatch):
     graph = Graph().parse(
         Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
     )
@@ -336,19 +337,27 @@ def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path):
         ),
         format="turtle",
     )
+    graph.set(
+        (
+            URIRef("https://other.example.org/Dataset"),
+            DCTERMS.publisher,
+            URIRef("https://example.org/publisher"),
+        )
+    )
     stamp = "one"
+    dump_stamp = "one"
     queries, metadata = [], []
     scoped = False
     removed = False
 
     def respond(request):
         if request.url.path == "/all.rdf":
-            if request.headers.get("If-None-Match"):
+            if request.headers.get("If-None-Match") == f'"{dump_stamp}"':
                 return httpx.Response(304)
             return httpx.Response(
                 200,
                 content=graph.serialize(format="xml").encode(),
-                headers={"ETag": '"same"'},
+                headers={"ETag": f'"{dump_stamp}"'},
             )
         if "/metadata/" in request.url.path:
             context = request.url.path.split("/")[2]
@@ -394,7 +403,7 @@ def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path):
         )
 
     async def run():
-        nonlocal stamp, scoped, removed
+        nonlocal stamp, scoped, removed, dump_stamp
         async with PortalClient(
             Harvest(), transport=httpx.MockTransport(respond)
         ) as client:
@@ -413,24 +422,66 @@ def test_one_changed_context_does_not_enumerate_other_catalogs(tmp_path):
             )
             assert old_other.catalog_ids
             stamp, scoped = "two", True
+            dump_stamp = "two"
+            graph.set(
+                (
+                    URIRef("https://example.org/Dataset"),
+                    DCTERMS.title,
+                    Literal("Changed"),
+                )
+            )
             queries.clear()
             metadata.clear()
-            second, _ = await DataportalSource().harvest(
-                client,
-                first.records,
-                tmp_path / "second",
-                cached_dump=raw,
-                previous_status=status,
-                changed_contexts={"one"},
-            )
+            original_walk = Graph.predicate_objects
+
+            def guarded_walk(self, subject=None, *args, **kwargs):
+                if self is not graph:
+                    assert subject != URIRef("https://other.example.org/Dataset"), (
+                        "Traversed an unchanged catalog's RDF"
+                    )
+                return original_walk(self, subject, *args, **kwargs)
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Graph, "predicate_objects", guarded_walk)
+                second, _ = await DataportalSource().harvest(
+                    client,
+                    first.records,
+                    tmp_path / "second",
+                    cached_dump=raw,
+                    previous_status=status,
+                    changed_contexts={"one"},
+                )
             assert not second.failures
             assert second.records[old_other.id] == old_other
             assert metadata == ["one"]
             assert len(queries) == 4
+            dump_stamp, stamp = "three", "three"
+            graph.set(
+                (
+                    URIRef("https://example.org/publisher"),
+                    FOAF.name,
+                    Literal("Changed publisher"),
+                )
+            )
+            shared, _ = await DataportalSource().harvest(
+                client,
+                second.records,
+                tmp_path / "shared",
+                cached_dump=raw,
+                previous_status=status,
+                changed_contexts={"one"},
+            )
+            # The shared publisher invalidates the dependent dataset across contexts.
+            assert shared.records[old_other.id].digest != old_other.digest
+            assert any(
+                e["title"] == {"und": ["Changed publisher"]}
+                for e in shared.records[old_other.id].entities
+                if e["kind"] == "publishers"
+            )
             removed = True
             third, _ = await DataportalSource().harvest(
                 client,
-                second.records,
+                shared.records,
                 tmp_path / "third",
                 cached_dump=raw,
                 previous_status=status,

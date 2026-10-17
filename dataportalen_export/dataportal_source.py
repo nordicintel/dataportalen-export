@@ -10,6 +10,7 @@ from dataportalen_export.context_index import ContextIndex
 from dataportalen_export.current_state import SourceBatch, make_record
 from dataportalen_export.identity import stable_id
 from dataportalen_export.portal_client import DUMP
+from dataportalen_export.rdf_changes import changed_uris, may_reference
 from dataportalen_export.rdf_converter import closure, parse_rdf
 from dataportalen_export.rdf_graph import graph_digest
 
@@ -113,7 +114,30 @@ class DataportalSource:
             for uri, ids in index.resource_ids.items()
             if len(ids) == 1
         }
-        for number, node in enumerate(nodes, 1):
+        deferred = []
+        active = []
+        for node in nodes:
+            old = retained.get(str(node))
+            if (
+                changed_contexts is not None
+                and old
+                and old.catalog_ids
+                and not force
+                and not set(old.catalog_ids) & index.affected_catalogs
+                and str(node) not in index.entries
+                and str(node) not in index.affected_uris
+            ):
+                deferred.append(node)
+            else:
+                active.append(node)
+        shared_changes = set()
+        if deferred and not reuse_dump:
+            present = {str(node) for node in nodes}
+            for uri, old in retained.items():
+                if uri not in present:
+                    shared_changes.update(changed_uris(old, Graph()))
+
+        def process(node, *, track_changes=False):
             native = str(node)
             key = stable_id("source", f"dataportal:{native}")
             batch.seen.add(key)
@@ -121,6 +145,8 @@ class DataportalSource:
             try:
                 subgraph = None if reuse_dump else closure(graph, node)
                 digest = old.digest if reuse_dump else graph_digest(subgraph)
+                if track_changes and (old is None or old.digest != digest):
+                    shared_changes.update(changed_uris(old, subgraph))
                 catalogs = index.membership(native)
                 if not index.complete and old:
                     catalogs = sorted(set(catalogs) | set(old.catalog_ids))
@@ -149,8 +175,26 @@ class DataportalSource:
                     batch.fetched += 1
             except ValueError as error:
                 batch.failures[key] = str(error)[:400]
+
+        for number, node in enumerate(active, 1):
+            process(node, track_changes=bool(deferred) and not reuse_dump)
             if number % 2000 == 0:
-                log.info("Dataportal processed %d/%d roots", number, len(nodes))
+                log.info(
+                    "Dataportal processed %d/%d affected roots", number, len(active)
+                )
+        for node in deferred:
+            old = retained[str(node)]
+            if shared_changes and may_reference(old.rdf, shared_changes):
+                process(node)
+            else:
+                batch.records[old.id] = old
+                batch.seen.add(old.id)
+                batch.reused += 1
+        log.info(
+            "Dataportal: %d affected roots; %d roots outside changed contexts considered for reuse",
+            len(active),
+            len(deferred),
+        )
         if index.complete:
             batch.complete_scopes.add("dataportal")
         batch.successful_scopes.add("dataportal")
