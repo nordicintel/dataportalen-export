@@ -43,6 +43,16 @@ with lzma.open("data/source_records.jsonl.xz", "rt", encoding="utf-8") as record
     print(first["source"], first["root_uri"], first["stale"])
 ```
 
+To open a compressed database, first unpack it (use the same pattern for DuckDB):
+
+```python
+import lzma
+import shutil
+
+with lzma.open("data/catalog.db.xz", "rb") as source, open("catalog.db", "wb") as target:
+    shutil.copyfileobj(source, target)
+```
+
 ## Run and configure
 
 The application lives in this repository and is not installed as a Python
@@ -179,16 +189,18 @@ Do not delete retained state to resolve a transient failure.
 
 Dataportal dump requests use retained HTTP `ETag` and `Last-Modified` validators;
 an unchanged response downloads no dump body and reuses the accepted records.
-Catalog metadata uses EntryScape's entry modification timestamp, and EU datasets
-use the API's catalog-record modification timestamp. Missing signals cause a
+Catalog metadata uses EntryScape's entry modification timestamp, EU catalogs use
+their modification timestamp, and EU datasets use the API's catalog-record
+modification timestamp. Missing signals cause a
 fetch, and `--force` bypasses these checks. Validators are stored in the current
 manifest alongside the retained source records, without another cache database.
 
 Unchanged catalog JSONL and JSON-LD files are reused using content fingerprints.
 Only affected catalog files are regenerated; changes to shared metadata also
 invalidate the catalogs that use it. The combined files are checked separately.
-Shared SQLite, DuckDB, and Parquet products are reused when their accepted state
-is unchanged; changed shared databases are rebuilt and compressed as whole files.
+The compressed source archive and shared SQLite, DuckDB, and Parquet products are
+reused when their accepted state is unchanged; changed shared databases are
+rebuilt and compressed as whole files.
 
 If export generation fails in Actions, the `failed-harvest-state` artifact retains
 the source state, original dump, and compressed database candidates for one day.
