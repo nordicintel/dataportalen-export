@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Check daily schedule
         id: schedule
         env:
