@@ -60,6 +60,26 @@ def test_dates_accept_reduced_precision_and_normalize_timestamps(caplog):
         caplog.clear()
 
 
+def test_byte_counts_accept_grouped_digits_and_preserve_source_text():
+    for text, expected in [
+        ("155 648", 155648),
+        ("4\u00a0993\u00a0024", 4993024),
+        ("7.", 7),
+        ("2022-02-09", None),
+    ]:
+        graph = Graph().parse(
+            data="<urn:dist> a <http://www.w3.org/ns/dcat#Distribution> .",
+            format="turtle",
+        )
+        predicate = URIRef("http://www.w3.org/ns/dcat#byteSize")
+        graph.add((URIRef("urn:dist"), predicate, Literal(text)))
+        entities, _ = RdfConverter().convert(
+            graph, source="dataportal", scope="numbers"
+        )
+        assert entities[0].byte_size == expected
+        assert entities[0].extra_properties[str(predicate)][0]["value"] == text
+
+
 def test_repeated_blank_node_components_do_not_stall_conversion():
     # Reduced from Trafikverket resource/254, where whole-graph canonicalization
     # stalled the hosted harvest. A subprocess bounds regression failures.

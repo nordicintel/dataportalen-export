@@ -14,6 +14,7 @@ from dataportalen_export.rdf_converter import (
     LINKS,
     MODELS,
     RdfConverter,
+    byte_size_projection,
     date_projection,
 )
 from dataportalen_export.rdf_graph import graph_digest
@@ -100,7 +101,7 @@ class CurrentState:
                 for line in stream
                 if line.strip()
             ]
-        # Repair date projections from retained lexical values without refetching
+        # Repair typed projections from retained lexical values without refetching
         # unchanged RDF or assigning a new successful-fetch timestamp.
         for record in records:
             for entity in record.entities:
@@ -111,6 +112,16 @@ class CurrentState:
                     entity[name] = date_projection(
                         sorted(
                             {item.get("value", item.get("id", "")) for item in values}
+                        ),
+                        entity.get("uri") or entity["id"],
+                    )
+                if entity["kind"] == "distributions":
+                    sizes = entity["extra_properties"].get(
+                        "http://www.w3.org/ns/dcat#byteSize", []
+                    )
+                    entity["byte_size"] = byte_size_projection(
+                        sorted(
+                            {item.get("value", item.get("id", "")) for item in sizes}
                         ),
                         entity.get("uri") or entity["id"],
                     )

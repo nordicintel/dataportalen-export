@@ -6,10 +6,12 @@ from rdflib import Graph
 from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
 
 
-def test_retained_dates_are_reprojected_without_changing_source_freshness(tmp_path):
+def test_retained_projections_update_without_changing_source_freshness(tmp_path):
     graph = Graph().parse(
         data="""<urn:dataset> a <http://www.w3.org/ns/dcat#Dataset>;
-        <http://purl.org/dc/terms/issued> "2006-09" .""",
+        <http://purl.org/dc/terms/issued> "2006-09" .
+        <urn:distribution> a <http://www.w3.org/ns/dcat#Distribution>;
+            <http://www.w3.org/ns/dcat#byteSize> "155 648" .""",
         format="turtle",
     )
     record = make_record(
@@ -23,6 +25,7 @@ def test_retained_dates_are_reprojected_without_changing_source_freshness(tmp_pa
     record.entities[0]["issued"] = (
         None  # State produced by the former restrictive parser.
     )
+    record.entities[1]["byte_size"] = None
     record.stale = True
     with gzip.open(
         tmp_path / "source_records.jsonl.gz", "wt", encoding="utf-8"
@@ -30,6 +33,7 @@ def test_retained_dates_are_reprojected_without_changing_source_freshness(tmp_pa
         stream.write(record.model_dump_json() + "\n")
     loaded = CurrentState.load(tmp_path).records[record.id]
     assert loaded.entities[0]["issued"] == "2006-09"
+    assert loaded.entities[1]["byte_size"] == 155648
     assert (loaded.rdf, loaded.digest, loaded.fetched_at, loaded.stale) == (
         record.rdf,
         record.digest,

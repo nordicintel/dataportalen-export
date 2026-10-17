@@ -127,6 +127,22 @@ def date_projection(candidates, node):
         return None
 
 
+def byte_size_projection(candidates, node):
+    if not candidates:
+        return None
+    value = candidates[0].strip()
+    if re.fullmatch(r"[0-9]{1,3}(?:[ \u00a0\u202f][0-9]{3})+(?:\.[0-9]+)?", value):
+        value = re.sub(r"\s", "", value)
+    try:
+        number = float(value)
+        if math.isfinite(number) and number >= 0:
+            return number
+    except ValueError:
+        pass
+    log.warning("Retained invalid byte size %s on %s", candidates[0], node)
+    return None
+
+
 class RdfConverter:
     entity_id = staticmethod(stable_id)
 
@@ -202,27 +218,15 @@ class RdfConverter:
                     access_rights=values(graph, node, DCTERMS.accessRights),
                 )
             if kind == "distributions":
-                size = values(graph, node, DCAT.byteSize)
-                number = None
-                if size:
-                    try:
-                        parsed = float(size[0])
-                        number = (
-                            parsed if math.isfinite(parsed) and parsed >= 0 else None
-                        )
-                    except ValueError:
-                        pass
-                    if number is None:
-                        log.warning(
-                            "Retained invalid byte size %s on %s", size[0], node
-                        )
                 fields.update(
                     access_urls=values(graph, node, DCAT.accessURL),
                     download_urls=values(graph, node, DCAT.downloadURL),
                     media_types=values(graph, node, DCAT.mediaType),
                     formats=values(graph, node, DCTERMS.format),
                     licenses=values(graph, node, DCTERMS.license),
-                    byte_size=number,
+                    byte_size=byte_size_projection(
+                        values(graph, node, DCAT.byteSize), node
+                    ),
                 )
             if kind == "data_services":
                 fields.update(
