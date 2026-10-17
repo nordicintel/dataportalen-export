@@ -87,6 +87,8 @@ Arrays remain arrays for one or many values. All original language tags survive.
 `extra_properties` retains RDF properties by full predicate IRI; literal objects
 retain their text, datatype, and language, and resource objects retain references.
 The original RDF preserves graph detail, including supporting blank nodes.
+Dates accept ISO years (`2022`), year-months (`2006-09`), full dates, and timestamps.
+Reduced precision stays intact; timestamps use `T` and explicit supplied offsets.
 Unparseable optional dates or numbers have null typed projections while their
 source values remain available. Source licenses and attribution are preserved;
 the code's MIT license does not replace the licenses of harvested metadata.
@@ -101,7 +103,7 @@ The six entity tables are `catalogs`, `datasets`, `dataset_series`,
 | `id` | Non-null primary key |
 | `uri` | Original/canonical URI; null for a blank-node entity |
 | `title_json`, `description_json` | Non-null language maps |
-| `issued`, `modified` | Nullable validated ISO date/date-time projections |
+| `issued`, `modified` | Nullable ISO year, year-month, date, or date-time projections |
 | `types_json`, `identifiers_json`, `homepages_json` | Non-null JSON arrays |
 | `full_json` | Complete convenient entity representation and RDF properties |
 
@@ -167,6 +169,12 @@ Inspect the Actions summary and manifest on failure. Correct configuration or
 source compatibility issues, then dispatch Harvest manually. Use `force` when
 intentionally rebuilding retained source projections after a schema change.
 Do not delete retained state to resolve a transient failure.
+
+If export generation fails in Actions, the `failed-harvest-state` artifact retains
+the source state, original dump, and any compressed SQLite candidate for one day.
+These diagnostics are not published under `data/`; they let an export fix reuse
+already retrieved metadata. Download the artifact from the failed run before it
+expires. Size-limit errors include the exact compressed byte count.
 
 ## Development checks
 

@@ -2,6 +2,7 @@
 
 import logging
 import math
+import re
 from datetime import date, datetime
 
 import rdflib
@@ -103,16 +104,23 @@ def values(graph, node, predicate):
 
 
 def date_value(graph, node, predicate):
-    candidates = values(graph, node, predicate)
+    return date_projection(values(graph, node, predicate), node)
+
+
+def date_projection(candidates, node):
+    """Project source date strings, including ISO reduced precision."""
     if not candidates:
         return None
-    value = candidates[0]
+    value = candidates[0].strip()
     try:
-        if "T" in value:
-            datetime.fromisoformat(value.replace("Z", "+00:00"))
-        else:
-            date.fromisoformat(value)
-        return value
+        if re.fullmatch(r"[0-9]{4}(?:-[0-9]{2})?", value):
+            parts = [int(part) for part in value.split("-")]
+            date(*(parts + [1] * (3 - len(parts))))
+            # Validate without inventing a month/day that the source did not supply.
+            return value
+        if "T" in value or " " in value:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).isoformat()
+        return date.fromisoformat(value).isoformat()
     except ValueError:
         log.warning("Retained invalid date %s on %s", value, node)
         return None

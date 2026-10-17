@@ -9,7 +9,12 @@ from rdflib import Graph
 
 from dataportalen_export.identity import stable_id
 from dataportalen_export.models.source_record import SourceRecord
-from dataportalen_export.rdf_converter import LINKS, MODELS, RdfConverter
+from dataportalen_export.rdf_converter import (
+    LINKS,
+    MODELS,
+    RdfConverter,
+    date_projection,
+)
 from dataportalen_export.rdf_graph import graph_digest
 
 SCHEMA_VERSION = 2
@@ -86,6 +91,20 @@ class CurrentState:
                 for line in stream
                 if line.strip()
             ]
+        # Repair date projections from retained lexical values without refetching
+        # unchanged RDF or assigning a new successful-fetch timestamp.
+        for record in records:
+            for entity in record.entities:
+                for name in ("issued", "modified"):
+                    values = entity["extra_properties"].get(
+                        f"http://purl.org/dc/terms/{name}", []
+                    )
+                    entity[name] = date_projection(
+                        sorted(
+                            {item.get("value", item.get("id", "")) for item in values}
+                        ),
+                        entity.get("uri") or entity["id"],
+                    )
         return cls({r.id: r for r in records})
 
     def apply(self, batch: SourceBatch):

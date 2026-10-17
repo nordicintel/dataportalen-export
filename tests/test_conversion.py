@@ -2,10 +2,37 @@ import subprocess
 import sys
 from pathlib import Path
 
-from rdflib import Graph, URIRef
+from rdflib import Graph, Literal, URIRef
+from rdflib.namespace import DCTERMS
 
 from dataportalen_export.rdf_converter import RdfConverter
 from dataportalen_export.rdf_graph import graph_digest
+
+
+def test_dates_accept_reduced_precision_and_normalize_timestamps(caplog):
+    cases = {
+        "2022": "2022",
+        "2006-09": "2006-09",
+        "2024-02-29": "2024-02-29",
+        "2026-10-17T08:30:00Z": "2026-10-17T08:30:00+00:00",
+        "2026-10-17 08:30:00+02:00": "2026-10-17T08:30:00+02:00",
+        "2023-02-29": None,
+        "2022-13": None,
+        "0NaN-NaN-NaN": None,
+    }
+    for original, expected in cases.items():
+        graph = Graph().parse(
+            data="<urn:dataset> a <http://www.w3.org/ns/dcat#Dataset> .",
+            format="turtle",
+        )
+        graph.add((URIRef("urn:dataset"), DCTERMS.issued, Literal(original)))
+        entities, _ = RdfConverter().convert(graph, source="dataportal", scope="dates")
+        dataset = entities[0]
+        assert dataset.issued == expected
+        assert dataset.extra_properties[str(DCTERMS.issued)][0]["value"] == original
+        if expected is not None:
+            assert not caplog.records
+        caplog.clear()
 
 
 def test_repeated_blank_node_components_do_not_stall_conversion():

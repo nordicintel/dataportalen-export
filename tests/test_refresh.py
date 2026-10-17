@@ -1,8 +1,41 @@
+import gzip
 from pathlib import Path
 
 from rdflib import Graph
 
 from dataportalen_export.current_state import CurrentState, SourceBatch, make_record
+
+
+def test_retained_dates_are_reprojected_without_changing_source_freshness(tmp_path):
+    graph = Graph().parse(
+        data="""<urn:dataset> a <http://www.w3.org/ns/dcat#Dataset>;
+        <http://purl.org/dc/terms/issued> "2006-09" .""",
+        format="turtle",
+    )
+    record = make_record(
+        graph,
+        source="dataportal",
+        native_id="dates",
+        scope="dataportal",
+        root_uri="urn:dataset",
+        stamp="one",
+    )
+    record.entities[0]["issued"] = (
+        None  # State produced by the former restrictive parser.
+    )
+    record.stale = True
+    with gzip.open(
+        tmp_path / "source_records.jsonl.gz", "wt", encoding="utf-8"
+    ) as stream:
+        stream.write(record.model_dump_json() + "\n")
+    loaded = CurrentState.load(tmp_path).records[record.id]
+    assert loaded.entities[0]["issued"] == "2006-09"
+    assert (loaded.rdf, loaded.digest, loaded.fetched_at, loaded.stale) == (
+        record.rdf,
+        record.digest,
+        record.fetched_at,
+        True,
+    )
 
 
 def test_refresh_retains_failures_and_only_deletes_confirmed_absences():

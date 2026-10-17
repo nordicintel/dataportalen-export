@@ -5,8 +5,8 @@ Issue conventions: `docs/agents/issue-tracker.md`.
 ## ISSUE-001: Implement the daily Swedish catalog metadata exporter
 
 State: open
-Status: needs-triage
-Assignee: unassigned
+Status: ready-for-agent
+Assignee: Codex
 Type: task
 
 ### Objective and agreed scope
@@ -244,3 +244,4 @@ Each phase consists of small vertical slices: write one failing behavioral test,
 ### Comments
 
 - 2026-10-17: Interview decisions incorporated into this draft. Implementation has not started. Awaiting confirmation that the written plan captures the agreed scope.
+- 2026-10-17: Plan approved and implementation completed; 17 behavioral tests and Ruff pass. Full hosted acceptance is in progress. The user explicitly authorized making the repository public before hosted verification after private Actions was blocked by account billing. The repository is public; this supersedes the original visibility ordering above. Performance diagnosis found repeated independent RDF blank-node structures causing global canonicalization to stall; component canonicalization preserves graph topology and passes the previously slow records. Hosted export verification exposed an oversized SQLite product, which remains a publication blocker until corrected and verified.
