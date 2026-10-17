@@ -48,3 +48,7 @@ Line numbers refer to the locally audited full harvest. IDs are stable lookup ke
 | 19113 | `https-doi-org-10-23695-xg8r-sb12` | 1 | 0 |
 | 16796 | `http-api-kolada-se-v3-kpi-n85076` | 1 | 1 |
 | 16852 | `http-api-kolada-se-v3-kpi-n02305` | 1 | 1 |
+
+## Gzip publication
+
+The rebuilt SQLite database compresses to 33,487,655 bytes with gzip level 6 (33.49 MB), below the requested 90 MB ceiling. The same random-sample comparisons, full-record/child comparisons and SQLite integrity checks passed after decompression. Output is now `data/catalog.db.gz`; the Zstandard artifact and dependency were removed.

@@ -18,4 +18,4 @@ timezone = "Europe/Stockholm"
 
 [database]
 enabled = true
-zstd_level = 6
+gzip_level = 6

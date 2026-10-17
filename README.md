@@ -2,7 +2,7 @@
 
 A small repository-local scraper. Each harvest replaces
 [`data/datasets.jsonl.gz`](data/datasets.jsonl.gz) with complete search records.
-The optional [`data/catalog.db.zst`](data/catalog.db.zst) is rebuilt from that file.
+The optional [`data/catalog.db.gz`](data/catalog.db.gz) is rebuilt from that file.
 
 ## Run
 
@@ -37,7 +37,7 @@ All operational settings live in [`config.toml`](config.toml):
 | `schedule.time` | Local daily time, `HH:MM`; defaults to `06:00` |
 | `schedule.timezone` | IANA timezone; defaults to `Europe/Stockholm` |
 | `database.enabled` | Also rebuild SQLite during Harvest; defaults to true |
-| `database.zstd_level` | SQLite Zstandard compression level; defaults to 6 |
+| `database.gzip_level` | SQLite gzip compression level; defaults to 6 |
 
 Catalog and country selections form a **union**. A dataset matching both is written
 once, using its API dataset ID. At least one selection is required.
@@ -94,10 +94,14 @@ language-filtered API record, including all nested distributions and services.
 Decompress SQLite before opening it:
 
 ```python
-import zstandard
+import gzip
+import shutil
 
-with open("data/catalog.db.zst", "rb") as source, open("catalog.db", "wb") as target:
-    zstandard.ZstdDecompressor().copy_stream(source, target)
+with (
+    gzip.open("data/catalog.db.gz", "rb") as source,
+    open("catalog.db", "wb") as target,
+):
+    shutil.copyfileobj(source, target)
 ```
 
 ```sql
@@ -121,4 +125,4 @@ uv run ruff check .
 uv run ruff format --check .
 ```
 
-Tests use mocked external HTTP pages and real gzip, Zstandard, and SQLite files.
+Tests use mocked external HTTP pages and real gzip and SQLite files.

@@ -2,7 +2,7 @@
 
 Replace the existing implementation with a direct adaptation of your [script](https://gist.github.com/rubenselander/d7f55c2d56e483db6c4417d44071a601) and the pasted SQL schema.
 
-The scraper produces one complete `datasets.jsonl.gz` every day. The database builder reads that file and creates `catalog.db.zst`. There is no incremental harvesting, content comparison, retained source state, or export framework.
+The scraper produces one complete `datasets.jsonl.gz` every day. The database builder reads that file and creates `catalog.db.gz`. There is no incremental harvesting, content comparison, retained source state, or export framework.
 
 ## 1. Delete the existing application and obsolete outputs
 
@@ -46,7 +46,7 @@ LICENSE
 
 data/
     datasets.jsonl.gz
-    catalog.db.zst          # optional
+    catalog.db.gz          # optional
 ```
 
 Keep dependency-only uv configuration. This remains repo-local code, with no installable package or build backend.
@@ -96,7 +96,7 @@ Write to one temporary gzip file and rename it to the final filename when the st
 Root `config.toml` controls catalog IDs, country IDs, language keys, page size,
 request attempts, timeout, retry backoff, page delay, gzip level, logging level,
 automatic schedule enablement, interval in days, local time, IANA timezone,
-automatic database creation, and Zstandard level. Defaults are recorded in that file.
+automatic database creation, and gzip level. Defaults are recorded in that file.
 An empty language list keeps all languages. Catalog/country selections form a union.
 
 `database.enabled` controls whether the daily harvest also builds SQLite. It does
@@ -231,10 +231,10 @@ Its operation is sequential:
 4. Read the gzip JSONL line by line.
 5. Insert catalog/publisher records and each dataset’s distributions/services.
 6. Commit and close SQLite.
-7. Compress the database with **Zstandard** to `data/catalog.db.zst`.
+7. Compress the database with **gzip** to `data/catalog.db.gz`.
 8. Replace the previous compressed database and remove temporary files.
 
-Use `sqlite3`, `gzip`, `json`, and `pathlib` from the standard library, plus the `zstandard` package. Use a fixed Zstandard level of **6** initially.
+Use `sqlite3`, `gzip`, `json`, and `pathlib` from the standard library. Use configurable gzip level **6** initially.
 
 The builder:
 
@@ -287,7 +287,7 @@ It:
 - Checks out the latest branch.
 - Fails clearly if the gzip JSONL does not exist.
 - Builds exclusively from the checked-out JSONL.
-- Publishes only `catalog.db.zst`.
+- Publishes only `catalog.db.gz`.
 - Uses the same publication concurrency group as the harvest.
 
 This provides the requested database recreation without rerunning the scrape.
@@ -324,7 +324,7 @@ Verify:
 - All 34 JSON-bearing columns have declared type `JSON`, as exposed by SQLite table metadata.
 - Language maps and embedded collections survive SQL insertion.
 - Dataset, distribution, and service parent references work.
-- The `.db.zst` decompresses into a readable SQLite database.
+- The `.db.gz` decompresses into a readable SQLite database.
 - Missing gzip input produces the explicit error.
 - Rebuilding removes records absent from the new JSONL.
 

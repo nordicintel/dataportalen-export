@@ -48,7 +48,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/datasets.jsonl.gz
-          if [ "$DATABASE_OUTCOME" = 'success' ]; then git add data/catalog.db.zst; fi
+          if [ "$DATABASE_OUTCOME" = 'success' ]; then git add data/catalog.db.gz; fi
           git diff --cached --quiet && exit 0
           git commit -m 'Refresh dataset downloads'
           git push origin "HEAD:$GITHUB_REF_NAME"

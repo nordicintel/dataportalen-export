@@ -3,12 +3,11 @@
 import gzip
 import json
 import os
+import shutil
 import sqlite3
 import tempfile
 import tomllib
 from pathlib import Path
-
-import zstandard
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,9 +30,9 @@ def scalar(value):
 
 def build_database(
     source: Path = ROOT / "data/datasets.jsonl.gz",
-    target: Path = ROOT / "data/catalog.db.zst",
+    target: Path = ROOT / "data/catalog.db.gz",
     *,
-    zstd_level: int = 6,
+    gzip_level: int = 6,
 ) -> dict:
     if not source.is_file():
         raise FileNotFoundError(f"Missing {source}. Run the Harvest workflow first.")
@@ -302,9 +301,12 @@ def build_database(
             }
         finally:
             db.close()
-        compressed = Path(temporary) / "catalog.db.zst"
-        with database.open("rb") as incoming, compressed.open("wb") as outgoing:
-            zstandard.ZstdCompressor(level=zstd_level).copy_stream(incoming, outgoing)
+        compressed = Path(temporary) / "catalog.db.gz"
+        with (
+            database.open("rb") as incoming,
+            gzip.open(compressed, "wb", compresslevel=gzip_level) as outgoing,
+        ):
+            shutil.copyfileobj(incoming, outgoing)
         os.replace(compressed, target)
     print(json.dumps(counts))
     return counts
@@ -312,7 +314,7 @@ def build_database(
 
 def main():
     config = tomllib.loads((ROOT / "config.toml").read_text(encoding="utf-8"))
-    counts = build_database(zstd_level=config["database"]["zstd_level"])
+    counts = build_database(gzip_level=config["database"]["gzip_level"])
     if filename := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(filename, "a", encoding="utf-8") as stream:
             stream.write(

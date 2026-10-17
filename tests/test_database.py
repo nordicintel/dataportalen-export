@@ -1,10 +1,10 @@
 import gzip
 import json
+import shutil
 import sqlite3
 from pathlib import Path
 
 import pytest
-import zstandard
 
 from scripts.build_database import build_database
 
@@ -16,10 +16,10 @@ def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
         "http://data.europa.eu/eli/reg_impl/2023/138/oj"
     ]
     source = tmp_path / "datasets.jsonl.gz"
-    target = tmp_path / "catalog.db.zst"
+    target = tmp_path / "catalog.db.gz"
     with gzip.open(source, "wt", encoding="utf-8") as stream:
         stream.write(json.dumps(record) + "\n")
-    counts = build_database(source, target, zstd_level=1)
+    counts = build_database(source, target, gzip_level=1)
     assert counts == {
         "catalogs": 1,
         "publishers": 1,
@@ -28,8 +28,8 @@ def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
         "data_services": 1,
     }
     database = tmp_path / "catalog.db"
-    with target.open("rb") as incoming, database.open("wb") as outgoing:
-        zstandard.ZstdDecompressor().copy_stream(incoming, outgoing)
+    with gzip.open(target, "rb") as incoming, database.open("wb") as outgoing:
+        shutil.copyfileobj(incoming, outgoing)
     with sqlite3.connect(database) as db:
         assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -124,7 +124,7 @@ def test_database_embeds_collections_preserves_records_and_rebuilds(tmp_path):
 
 
 def test_missing_or_bad_input_preserves_database(tmp_path):
-    target = tmp_path / "catalog.db.zst"
+    target = tmp_path / "catalog.db.gz"
     target.write_bytes(b"previous database")
     source = tmp_path / "datasets.jsonl.gz"
     with pytest.raises(FileNotFoundError, match="Run the Harvest workflow first"):
