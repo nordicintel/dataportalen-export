@@ -16,6 +16,7 @@ class ContextIndex:
     def __init__(self):
         self.entries = defaultdict(set)
         self.catalogs = defaultdict(list)
+        self.resource_ids = defaultdict(set)
         self.complete = False
 
     async def load(self, client, batch, previous):
@@ -27,6 +28,7 @@ class ContextIndex:
                 context = record.native_id.split(":", 2)[1]
                 for entity in record.entities:
                     if entity["kind"] == "catalogs":
+                        self.resource_ids[entity["uri"]].add(entity["id"])
                         members = {
                             value["id"]
                             for value in entity["extra_properties"].get(
@@ -60,6 +62,8 @@ class ContextIndex:
                     str(node): stable_id("catalogs", f"dataportal:{context}:{node}")
                     for node in nodes
                 }
+                for uri, identifier in ids.items():
+                    self.resource_ids[uri].add(identifier)
                 record = make_record(
                     graph,
                     source="dataportal",

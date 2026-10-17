@@ -51,6 +51,11 @@ class DataportalSource:
             await index.load(client, batch, previous)
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
             batch.failures["dataportal:contexts"] = str(error)[:400]
+        catalog_overrides = {
+            uri: next(iter(ids))
+            for uri, ids in index.resource_ids.items()
+            if len(ids) == 1
+        }
         for number, node in enumerate(nodes, 1):
             native = str(node)
             key = stable_id("source", f"dataportal:{native}")
@@ -79,6 +84,7 @@ class DataportalSource:
                         root_uri=native,
                         stamp=digest,
                         catalog_ids=catalogs,
+                        catalog_id_overrides=catalog_overrides,
                     )
                     if old and old.digest == digest:
                         batch.records[key].fetched_at = old.fetched_at

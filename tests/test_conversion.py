@@ -9,6 +9,31 @@ from dataportalen_export.rdf_converter import RdfConverter
 from dataportalen_export.rdf_graph import graph_digest
 
 
+def test_one_resource_can_be_a_catalog_dataset_and_publisher():
+    # SwedishPolls uses the same URI for these three RDF roles.
+    graph = Graph().parse(
+        data="""
+        <urn:polls> a <http://www.w3.org/ns/dcat#Catalog>,
+            <http://www.w3.org/ns/dcat#Dataset>, <http://xmlns.com/foaf/0.1/Agent>;
+            <http://www.w3.org/ns/dcat#dataset> <urn:polls>;
+            <http://purl.org/dc/terms/publisher> <urn:polls>.
+    """,
+        format="turtle",
+    )
+    entities, links = RdfConverter().convert(graph, source="dataportal", scope="roles")
+    assert {entity.kind for entity in entities} == {
+        "catalogs",
+        "datasets",
+        "publishers",
+    }
+    assert len({entity.id for entity in entities}) == 3
+    assert {row[0] for row in links} == {
+        "catalog_datasets",
+        "catalog_publishers",
+        "dataset_publishers",
+    }
+
+
 def test_dates_accept_reduced_precision_and_normalize_timestamps(caplog):
     cases = {
         "2022": "2022",

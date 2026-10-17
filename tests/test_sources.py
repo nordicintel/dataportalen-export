@@ -48,6 +48,10 @@ def test_failed_catalog_metadata_preserves_known_memberships(tmp_path):
     graph = Graph().parse(
         Path(__file__).parent / "fixtures/catalog.ttl", format="turtle"
     )
+    graph.parse(
+        data="<https://example.org/catalog> a <http://www.w3.org/ns/dcat#Dataset> .",
+        format="turtle",
+    )
     dump = graph.serialize(format="xml").encode()
     catalog = """@prefix dcat: <http://www.w3.org/ns/dcat#> .
         <https://example.org/catalog> a dcat:Catalog;
@@ -95,6 +99,7 @@ def test_failed_catalog_metadata_preserves_known_memberships(tmp_path):
         ) as client:
             first, _ = await DataportalSource().harvest(client, {}, tmp_path)
             state = CurrentState(first.records)
+            assert len(state.materialize()[0]["catalogs"]) == 2
             unchanged, _ = await DataportalSource().harvest(
                 client, state.records, tmp_path
             )

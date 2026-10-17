@@ -3,6 +3,7 @@
 import logging
 import math
 import re
+from collections import defaultdict
 from datetime import date, datetime
 
 import rdflib
@@ -134,15 +135,20 @@ class RdfConverter:
     ):
         graph = canonical_graph(graph)
         aliases, catalog_ids = aliases or {}, catalog_ids or {}
-        kinds = {}
+        kinds = defaultdict(set)
         for node, rdf_type in graph.subject_objects(RDF.type):
             if rdf_type in TYPES:
-                kind = TYPES[rdf_type]
-                if node not in kinds or kind == "dataset_series":
-                    kinds[node] = kind
+                kinds[node].add(TYPES[rdf_type])
         for node in graph.objects(None, DCTERMS.publisher):
             if (node, None, None) in graph:
-                kinds.setdefault(node, "publishers")
+                kinds[node].add("publishers")
+        for roles in kinds.values():
+            if "dataset_series" in roles:
+                roles.discard("datasets")
+        typed_nodes = sorted(
+            ((node, kind) for node, roles in kinds.items() for kind in roles),
+            key=lambda item: (str(item[0]), item[1]),
+        )
 
         def identity(node, kind):
             uri = aliases.get(str(node), str(node))
@@ -164,7 +170,7 @@ class RdfConverter:
             }
 
         entities = []
-        for node, kind in sorted(kinds.items(), key=lambda item: str(item[0])):
+        for node, kind in typed_nodes:
             props = {}
             for predicate, obj in graph.predicate_objects(node):
                 props.setdefault(str(predicate), []).append(term(obj))
@@ -225,7 +231,7 @@ class RdfConverter:
                 )
             entities.append(MODELS[kind](**fields))
         links = set()
-        for node, kind in kinds.items():
+        for node, kind in typed_nodes:
             relationships = [
                 (
                     DCTERMS.publisher,
@@ -269,7 +275,7 @@ class RdfConverter:
                 if table is None:
                     continue
                 for obj in graph.objects(node, predicate):
-                    if obj in kinds and kinds[obj] != target_kind:
+                    if obj in kinds and target_kind not in kinds[obj]:
                         continue
                     left, right = identity(node, kind), identity(obj, target_kind)
                     links.add((table, right, left) if reverse else (table, left, right))
