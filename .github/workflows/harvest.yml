@@ -84,3 +84,6 @@ jobs:
           if git diff --cached --quiet; then exit 0; fi
           git commit -m 'Refresh current catalog exports'
           git push origin HEAD:main
+      - name: Verify the next scheduled check skips today
+        if: success() && steps.schedule.outputs.due == 'true'
+        run: test "$(python -m dataportalen_export.schedule)" = 'due=false'
