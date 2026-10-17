@@ -49,6 +49,18 @@ jobs:
           else
             /usr/bin/time -v uv run --no-dev python -m dataportalen_export
           fi
+      - name: Retain failed source state for diagnosis
+        if: failure() && steps.harvest.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-harvest-state
+          path: |
+            .export-*/data/source_records.jsonl.gz
+            .export-*/data/raw/dataportal.rdf.gz
+            .export-*/data/catalog.db.gz
+          include-hidden-files: true
+          retention-days: 1
+          compression-level: 0
       - name: Record attempt and publish
         if: always() && steps.schedule.outputs.due == 'true'
         env:

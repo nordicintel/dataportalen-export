@@ -75,7 +75,7 @@ def test_all_exports_are_consistent_readable_and_preserve_raw_graph(tmp_path):
     assert restored.records.keys() == state.records.keys()
 
 
-def test_export_failure_preserves_previous_directory(tmp_path):
+def test_export_failure_preserves_previous_directory(tmp_path, monkeypatch):
     state, _ = fixture_state()
     config = Config()
     config.output.directory = tmp_path / "data"
@@ -84,9 +84,11 @@ def test_export_failure_preserves_previous_directory(tmp_path):
     # An invalid polymorphic reference is rejected before replacing any output.
     record = next(iter(state.records.values()))
     record.entities[0]["id"] = ""
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
     with pytest.raises(ValueError):
         write_products(state, config, [], attempted_at="2026-10-18T07:00:00+00:00")
     assert (config.output.directory / "manifest.json").read_bytes() == before
+    assert list(tmp_path.glob(".export-*/data"))
 
 
 def test_jsonld_variants_do_not_share_unrelated_blank_nodes(tmp_path):

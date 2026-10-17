@@ -1,7 +1,7 @@
 """Canonicalize independent blank-node components without global permutations."""
 
 import hashlib
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from rdflib import BNode, Graph
 from rdflib.compare import to_canonical_graph
@@ -29,7 +29,7 @@ def canonical_graph(graph: Graph) -> Graph:
         for node in nodes:
             attached[node].add(triple)
     remaining = set(attached)
-    occurrences = Counter()
+    components = []
     while remaining:
         pending = [remaining.pop()]
         triples = set()
@@ -45,16 +45,20 @@ def canonical_graph(graph: Graph) -> Graph:
         for triple in triples:
             component.add(triple)
         canonical = to_canonical_graph(component)
-        digest = hashlib.sha256(graph_bytes(canonical)).hexdigest()
-        prefix = f"{digest}_{occurrences[digest]}_"
-        occurrences[digest] += 1
+        components.append((graph_bytes(canonical), canonical))
+    # Compact labels avoid repeating two long hashes in every RDF property.
+    # Equal components remain separate occurrences with identical local topology.
+    for index, (_, canonical) in enumerate(
+        sorted(components, key=lambda item: item[0])
+    ):
+        nodes = sorted(
+            {term for triple in canonical for term in triple if isinstance(term, BNode)}
+        )
+        labels = {
+            node: BNode(f"b{index}n{number}") for number, node in enumerate(nodes)
+        }
         for triple in canonical:
-            result.add(
-                tuple(
-                    BNode(prefix + str(term)) if isinstance(term, BNode) else term
-                    for term in triple
-                )
-            )
+            result.add(tuple(labels.get(term, term) for term in triple))
     return result
 
 

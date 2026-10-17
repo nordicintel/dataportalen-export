@@ -48,7 +48,13 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
         and not (output / "manifest.json").exists()
     ):
         raise ValueError("Refusing to replace an unmanaged nonempty output directory")
-    with tempfile.TemporaryDirectory(prefix=".export-", dir=output.parent) as temporary:
+    # Hosted failures retain their candidate for the short-lived diagnostic artifact.
+    # Local runs clean up normally; hosted runners discard their workspace afterward.
+    with tempfile.TemporaryDirectory(
+        prefix=".export-",
+        dir=output.parent,
+        delete=os.environ.get("GITHUB_ACTIONS") != "true",
+    ) as temporary:
         root = Path(temporary).resolve()
         candidate = root / "data"
         candidate.mkdir()
@@ -134,7 +140,8 @@ def write_products(state, config, batches, *, attempted_at, raw_dump=None):
                     path.unlink()
                 else:
                     raise ValueError(
-                        f"Required export exceeds GitHub limit: {path.relative_to(candidate)}"
+                        f"Required export exceeds GitHub limit: {path.relative_to(candidate)} "
+                        f"({path.stat().st_size:,} bytes; limit {100 * 1024**2:,})"
                     )
         failures = {
             key: value for batch in batches for key, value in batch.failures.items()
