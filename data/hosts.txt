@@ -86,6 +86,7 @@ cfconventions.org
 cgisaas.fi
 chalmers.se
 civictech.se
+ckan.org
 clustal.org
 cog-genomics.org
 copernicus.eu
