@@ -44,6 +44,7 @@ avropa.se
 azure-api.net
 bab.la
 barnsakert.se
+barntumorbanken.se
 bastad.se
 beast.community
 beneficial.no
@@ -388,6 +389,7 @@ naturvardsverket.se
 near-aging.se
 nerc.ac.uk
 neurobs.com
+nextcloud.com
 nf-co.re
 nih.gov
 nikon.com
