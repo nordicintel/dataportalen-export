@@ -246,6 +246,7 @@ hjo.se
 hsr.se
 huddinge.se
 hulclab.eu
+huwise.com
 i0t.se
 iaf.se
 iana.org
@@ -579,6 +580,7 @@ sustainability.google
 sva.se
 svd.se
 svedala.se
+svenskakyrkan.se
 sverigesmiljomal.se
 svk.se
 svt.se
