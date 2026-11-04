@@ -611,7 +611,6 @@ tmu.ac.jp
 tomelilla.se
 toreboda.se
 trafa.se
-trafficdata.se
 trafiklab.se
 trafikverket.se
 transportstyrelsen.se
