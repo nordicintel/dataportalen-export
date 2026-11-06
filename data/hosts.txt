@@ -88,6 +88,7 @@ cgisaas.fi
 chalmers.se
 civictech.se
 ckan.org
+clouds-and-precip.group
 clustal.org
 cog-genomics.org
 copernicus.eu
