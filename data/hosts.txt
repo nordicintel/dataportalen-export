@@ -5,7 +5,6 @@ abberior.rocks
 aclanthology.org
 aclweb.org
 acm.org
-acs.org
 adac.de
 adeye.se
 aeroseum.se
@@ -44,7 +43,6 @@ avropa.se
 azure-api.net
 bab.la
 barnsakert.se
-barntumorbanken.se
 bastad.se
 beast.community
 beneficial.no
@@ -127,7 +125,6 @@ ebi.ac.uk
 ecmwf.int
 ecogenomic.org
 ed.ac.uk
-eddylab.org
 eduskunta.fi
 effemm2.de
 ega-archive.org
@@ -391,7 +388,6 @@ naturvardsverket.se
 near-aging.se
 nerc.ac.uk
 neurobs.com
-nextcloud.com
 nf-co.re
 nih.gov
 nikon.com
