@@ -105,7 +105,6 @@ datacite.org
 datadrivensurveillance.org
 datahotell.se
 datalad.org
-dataplatform.se
 dataportal.se
 dataverkstad.se
 dataverse.no
