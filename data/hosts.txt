@@ -263,7 +263,6 @@ iffs.se
 illumina.com
 ilsp.gr
 imagej.net
-incanet.se
 informer.com
 infoval.se
 inkscape.org
@@ -434,6 +433,7 @@ ostergotlandsmuseum.se
 oup.com
 oxelosund.se
 oxyfi.se
+palaeogenetics.com
 parkknowit.com
 pathogens.se
 pelechanolab.com
